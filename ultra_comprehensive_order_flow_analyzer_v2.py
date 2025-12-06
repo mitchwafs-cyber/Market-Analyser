@@ -1313,8 +1313,9 @@ def calculate_impact_and_toxicity(df, window_sizes=[20, 50, 100]):
     
     # Signed-order autocorrelation (short horizons: 1, 3, 5 lags)
     for lag in [1, 3, 5]:
+        # Calculate autocorrelation using corr with shifted values
         df_work[f'signed_vol_autocorr_lag{lag}'] = df_work['signed_volume'].rolling(20).apply(
-            lambda x: x.autocorr(lag=lag) if len(x) > lag else 0.0, raw=False
+            lambda x: pd.Series(x).corr(pd.Series(x).shift(lag)) if len(x) > lag else 0.0, raw=False
         ).fillna(0.0)
     
     # Refined VPIN with dynamic bucket sizing
@@ -1323,6 +1324,8 @@ def calculate_impact_and_toxicity(df, window_sizes=[20, 50, 100]):
     df_work['dynamic_bucket_size'] = np.sqrt(recent_vol_mean).fillna(50.0)
     
     # Calculate VPIN per dynamic bucket
+    # NOTE: This loop is necessary for dynamic bucket sizing based on recent volume
+    # For very large datasets, consider sampling or parallel processing if performance is critical
     df_work['cumulative_vol'] = df_work['quantity'].cumsum()
     vpin_refined = []
     
@@ -1726,9 +1729,14 @@ def analyze_session_microstructure(df):
         
         # Check if price returned to this POC after the session
         session_end_idx = df_work[df_work['session'] == session_name].index.max()
-        post_session_data = df_work.iloc[session_end_idx+1:]
         
-        if not post_session_data.empty:
+        # Validate session_end_idx is not NaN and is within bounds
+        if pd.notna(session_end_idx) and session_end_idx < len(df_work) - 1:
+            post_session_data = df_work.iloc[session_end_idx+1:]
+        else:
+            post_session_data = pd.DataFrame()
+        
+        if not post_session_data.empty and 'low' in post_session_data.columns and 'high' in post_session_data.columns:
             poc_revisited = ((post_session_data['low'] <= poc_price) & 
                             (post_session_data['high'] >= poc_price)).any()
         else:
@@ -1773,12 +1781,23 @@ def analyze_volume_delta_shape(df, bar_period='1min'):
     # Resample to bars for shape analysis
     df_work['time_bin'] = df_work['timestamp'].dt.floor(bar_period)
     
-    bar_stats = df_work.groupby('time_bin').agg({
-        'quantity': ['sum', lambda x: pd.Series(x).skew() if len(x) > 2 else 0, 
-                     lambda x: pd.Series(x).kurtosis() if len(x) > 2 else 0],
-        'delta': ['sum', lambda x: pd.Series(x).skew() if len(x) > 2 else 0,
-                  lambda x: pd.Series(x).kurtosis() if len(x) > 2 else 0]
-    }).reset_index()
+    # Use scipy for efficient skew/kurtosis calculation if available
+    if SCIPY:
+        from scipy.stats import skew, kurtosis
+        bar_stats = df_work.groupby('time_bin').agg({
+            'quantity': ['sum', lambda x: skew(x, nan_policy='omit') if len(x) > 2 else 0, 
+                         lambda x: kurtosis(x, nan_policy='omit') if len(x) > 2 else 0],
+            'delta': ['sum', lambda x: skew(x, nan_policy='omit') if len(x) > 2 else 0,
+                      lambda x: kurtosis(x, nan_policy='omit') if len(x) > 2 else 0]
+        }).reset_index()
+    else:
+        # Fallback to pandas
+        bar_stats = df_work.groupby('time_bin').agg({
+            'quantity': ['sum', lambda x: pd.Series(x).skew() if len(x) > 2 else 0, 
+                         lambda x: pd.Series(x).kurtosis() if len(x) > 2 else 0],
+            'delta': ['sum', lambda x: pd.Series(x).skew() if len(x) > 2 else 0,
+                      lambda x: pd.Series(x).kurtosis() if len(x) > 2 else 0]
+        }).reset_index()
     
     bar_stats.columns = ['time_bin', 'volume', 'volume_skew', 'volume_kurtosis',
                          'delta', 'delta_skew', 'delta_kurtosis']
@@ -1804,12 +1823,22 @@ def analyze_volume_delta_shape(df, bar_period='1min'):
     # Price bin shape analysis
     df_work['price_bin'] = (df_work['price'] // 1.0) * 1.0
     
-    price_stats = df_work.groupby('price_bin').agg({
-        'quantity': ['sum', lambda x: pd.Series(x).skew() if len(x) > 2 else 0,
-                     lambda x: pd.Series(x).kurtosis() if len(x) > 2 else 0],
-        'delta': ['sum', lambda x: pd.Series(x).skew() if len(x) > 2 else 0,
-                  lambda x: pd.Series(x).kurtosis() if len(x) > 2 else 0]
-    }).reset_index()
+    # Price bin shape analysis
+    if SCIPY:
+        from scipy.stats import skew, kurtosis
+        price_stats = df_work.groupby('price_bin').agg({
+            'quantity': ['sum', lambda x: skew(x, nan_policy='omit') if len(x) > 2 else 0,
+                         lambda x: kurtosis(x, nan_policy='omit') if len(x) > 2 else 0],
+            'delta': ['sum', lambda x: skew(x, nan_policy='omit') if len(x) > 2 else 0,
+                      lambda x: kurtosis(x, nan_policy='omit') if len(x) > 2 else 0]
+        }).reset_index()
+    else:
+        price_stats = df_work.groupby('price_bin').agg({
+            'quantity': ['sum', lambda x: pd.Series(x).skew() if len(x) > 2 else 0,
+                         lambda x: pd.Series(x).kurtosis() if len(x) > 2 else 0],
+            'delta': ['sum', lambda x: pd.Series(x).skew() if len(x) > 2 else 0,
+                      lambda x: pd.Series(x).kurtosis() if len(x) > 2 else 0]
+        }).reset_index()
     
     price_stats.columns = ['price', 'volume', 'volume_skew', 'volume_kurtosis',
                            'delta', 'delta_skew', 'delta_kurtosis']
@@ -2043,10 +2072,15 @@ def calculate_price_impact_asymmetry(df, vwap_data=None, poc_price=None):
     if len(buy_trades) > 10:
         # Simple linear relationship: price_change vs volume
         buy_trades['impact_per_unit'] = buy_trades['price_change'] / (buy_trades['buy_vol'] + 1e-9)
-        buy_impact_by_distance = buy_trades.groupby(
-            pd.cut(buy_trades['distance_from_vwap'], bins=10)
-        )['impact_per_unit'].mean().reset_index()
-        buy_impact_by_distance.columns = ['distance_bucket', 'buy_impact']
+        try:
+            # Use qcut for quantile-based binning to ensure balanced bins
+            buy_impact_by_distance = buy_trades.groupby(
+                pd.qcut(buy_trades['distance_from_vwap'], q=10, duplicates='drop')
+            )['impact_per_unit'].mean().reset_index()
+            buy_impact_by_distance.columns = ['distance_bucket', 'buy_impact']
+        except (ValueError, KeyError):
+            # Fallback to regular cut if qcut fails
+            buy_impact_by_distance = pd.DataFrame()
     else:
         buy_impact_by_distance = pd.DataFrame()
     
@@ -2054,10 +2088,15 @@ def calculate_price_impact_asymmetry(df, vwap_data=None, poc_price=None):
     sell_trades = df_work[df_work['sell_vol'] > 0].copy()
     if len(sell_trades) > 10:
         sell_trades['impact_per_unit'] = sell_trades['price_change'] / (sell_trades['sell_vol'] + 1e-9)
-        sell_impact_by_distance = sell_trades.groupby(
-            pd.cut(sell_trades['distance_from_vwap'], bins=10)
-        )['impact_per_unit'].mean().reset_index()
-        sell_impact_by_distance.columns = ['distance_bucket', 'sell_impact']
+        try:
+            # Use qcut for quantile-based binning to ensure balanced bins
+            sell_impact_by_distance = sell_trades.groupby(
+                pd.qcut(sell_trades['distance_from_vwap'], q=10, duplicates='drop')
+            )['impact_per_unit'].mean().reset_index()
+            sell_impact_by_distance.columns = ['distance_bucket', 'sell_impact']
+        except (ValueError, KeyError):
+            # Fallback to empty if qcut fails
+            sell_impact_by_distance = pd.DataFrame()
     else:
         sell_impact_by_distance = pd.DataFrame()
     
