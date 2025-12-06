@@ -1360,10 +1360,13 @@ def calculate_impact_and_toxicity(df, window_sizes=[20, 50, 100]):
     })
     
     print(f"\n📊 Results:")
-    print(f"  • Kyle lambda (20-bar): {df_work['kyle_lambda_20'].mean():.6f}")
-    print(f"  • Amihud illiquidity (50-bar): {df_work['amihud_illiq_50'].mean():.8f}")
+    if f'kyle_lambda_{window_sizes[0]}' in df_work.columns:
+        print(f"  • Kyle lambda ({window_sizes[0]}-bar): {df_work[f'kyle_lambda_{window_sizes[0]}'].mean():.6f}")
+    if f'amihud_illiq_{window_sizes[-1]}' in df_work.columns:
+        print(f"  • Amihud illiquidity ({window_sizes[-1]}-bar): {df_work[f'amihud_illiq_{window_sizes[-1]}'].mean():.8f}")
     print(f"  • VPIN refined spikes: {df_work['vpin_spike_refined'].sum()}")
-    print(f"  • Avg signed-vol autocorr (lag1): {df_work['signed_vol_autocorr_lag1'].mean():.4f}")
+    if 'signed_vol_autocorr_lag1' in df_work.columns:
+        print(f"  • Avg signed-vol autocorr (lag1): {df_work['signed_vol_autocorr_lag1'].mean():.4f}")
     
     return {
         'impact_data': df_work,
