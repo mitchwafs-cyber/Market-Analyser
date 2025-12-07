@@ -3498,13 +3498,18 @@ def process_single_file(zip_path, output_folder=OUTPUT_FOLDER):
     print("STEP 4: SAVING ALL TIMEFRAME FEATURES")
     print("="*80)
     
-    # 🔥 ADD PRICE ZONES TO ALL TIMEFRAMES
+    # 🔥 ADD PRICE ZONES AND EXACT PRICE LEVELS TO ALL TIMEFRAMES
     # This allows understanding what was happening at each price zone
+    # price_zone: The bin/range for aggregation (e.g., 95,520)
+    # zone_price_min/max: Exact price boundaries of that zone bin
     for df_name, df in [('agg1m_full', agg1m_full), ('agg5m_full', agg5m_full), 
                         ('agg15_full', agg15_full), ('agg1h_full', agg1h_full), 
                         ('agg4h_full', agg4h_full)]:
         if df is not None and not df.empty and 'close' in df.columns:
             df['price_zone'] = (df['close'] // BIN_SIZE) * BIN_SIZE
+            # Add exact zone boundaries for precision
+            df['zone_price_min'] = df['price_zone']
+            df['zone_price_max'] = df['price_zone'] + BIN_SIZE
     
     # 🔥 SAVE ALL TIMEFRAME FEATURES
     base_name = os.path.splitext(os.path.basename(zip_path))[0]
@@ -3529,11 +3534,15 @@ def process_single_file(zip_path, output_folder=OUTPUT_FOLDER):
     print(f"✓ Detected {len(buyer_sessions)} buyer sessions")
     print(f"✓ Detected {len(seller_sessions)} seller sessions")
 
-    # 🔥 ADD PRICE ZONES TO SCORED FEATURES
+    # 🔥 ADD PRICE ZONES AND EXACT PRICE LEVELS TO SCORED FEATURES
     if not agg15_scored_buy.empty and 'close' in agg15_scored_buy.columns:
         agg15_scored_buy['price_zone'] = (agg15_scored_buy['close'] // BIN_SIZE) * BIN_SIZE
+        agg15_scored_buy['zone_price_min'] = agg15_scored_buy['price_zone']
+        agg15_scored_buy['zone_price_max'] = agg15_scored_buy['price_zone'] + BIN_SIZE
     if not agg15_scored_seller.empty and 'close' in agg15_scored_seller.columns:
         agg15_scored_seller['price_zone'] = (agg15_scored_seller['close'] // BIN_SIZE) * BIN_SIZE
+        agg15_scored_seller['zone_price_min'] = agg15_scored_seller['price_zone']
+        agg15_scored_seller['zone_price_max'] = agg15_scored_seller['price_zone'] + BIN_SIZE
 
     # 🔥 SAVE 15M BUYER & SELLER SCORED FEATURES
     save_feature_output(agg15_scored_buy, "features_15m_buyer_scored", base_out)
@@ -3548,9 +3557,11 @@ def process_single_file(zip_path, output_folder=OUTPUT_FOLDER):
     anomaly_count = agg15_ml['is_ml_anomaly'].sum() if 'is_ml_anomaly' in agg15_ml.columns else 0
     print(f"✓ Detected {anomaly_count} anomalies")
     
-    # 🔥 ADD PRICE ZONE TO ANOMALY OUTPUT
+    # 🔥 ADD PRICE ZONE AND EXACT PRICE LEVELS TO ANOMALY OUTPUT
     if not agg15_ml.empty and 'close' in agg15_ml.columns:
         agg15_ml['price_zone'] = (agg15_ml['close'] // BIN_SIZE) * BIN_SIZE
+        agg15_ml['zone_price_min'] = agg15_ml['price_zone']
+        agg15_ml['zone_price_max'] = agg15_ml['price_zone'] + BIN_SIZE
     
     # 🔥 SAVE ML ANOMALY OUTPUT
     save_feature_output(agg15_ml, "anomalies_ml_15m", base_out)
@@ -3625,10 +3636,14 @@ def process_single_file(zip_path, output_folder=OUTPUT_FOLDER):
     print("STEP 11: ADVANCED ANALYTICS & NEW OUTPUTS")
     print("="*80)
     
-    # 🔥 ADD PRICE ZONE TO RAW TRADES
+    # 🔥 ADD PRICE ZONE AND EXACT PRICE LEVELS TO RAW TRADES
     # This allows understanding what was happening at each price zone at trade level
+    # price_zone: The bin for aggregation
+    # zone_price_min/max: Exact boundaries of that zone bin
     if 'price' in raw.columns:
         raw['price_zone'] = (raw['price'] // BIN_SIZE) * BIN_SIZE
+        raw['zone_price_min'] = raw['price_zone']
+        raw['zone_price_max'] = raw['price_zone'] + BIN_SIZE
     
     # 🔥 SAVE ENHANCED TRADE-LEVEL DATA
     print("💾 Saving enhanced trade-level data...")

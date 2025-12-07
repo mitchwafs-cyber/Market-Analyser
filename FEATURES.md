@@ -12,25 +12,52 @@ This document describes all the advanced features implemented in Code2 for insti
 - **Total Functions**: 72 functions
 - **New Output Files**: 20+ new CSV files per analysis run
 
-### Universal Price Zone Tracking (v2.5)
-**ALL output files now include `price_zone` column** for spatial analysis:
-- `features_[1m/5m/15m/1h/4h]_complete.csv` - All timeframe features tagged with zones
-- `features_15m_buyer_scored.csv` / `features_15m_seller_scored.csv` - Session-scored data
-- `anomalies_ml_15m.csv` - ML-detected anomalies with price context
-- `trade_level_enhanced.csv` - Every raw trade tagged with its zone
-- Plus all existing zone-specific files
+### Universal Price Zone Tracking (v2.5 + v2.6)
+**ALL output files now include `price_zone` AND exact zone boundaries** for comprehensive spatial analysis:
+
+**Columns Added to ALL Outputs**:
+- `price_zone`: The aggregation bin (e.g., 95,640 for BIN_SIZE=10)
+- `zone_price_min`: Exact lower boundary of the zone (e.g., 95,640.00)
+- `zone_price_max`: Exact upper boundary of the zone (e.g., 95,650.00)
+
+**Enhanced Files** (v2.6):
+- `features_[1m/5m/15m/1h/4h]_complete.csv` - All timeframe features with zone boundaries
+- `features_15m_buyer_scored.csv` / `features_15m_seller_scored.csv` - Session-scored data with boundaries
+- `anomalies_ml_15m.csv` - ML-detected anomalies with precise zone context
+- `trade_level_enhanced.csv` - Every raw trade with its zone boundaries
 
 **Benefits**:
-- Understand behavior at each price level across all analyses
-- Compare metrics across different price zones
-- Identify zone-specific patterns (e.g., high VPIN in certain zones)
-- Correlation between price levels and order flow dynamics
-- Enables zone-based filtering and aggregation of any metric
+- **Zone-level**: Understand behavior at each price level across all analyses
+- **Precision**: Know exact price boundaries for each zone (lower/upper limits)
+- **Filtering**: Easily filter data by price range using zone_price_min/max
+- **Pattern Detection**: Identify zone-specific patterns (e.g., high VPIN in 95,640-95,650)
+- **Cross-Analysis**: Correlate order flow dynamics with precise price levels
+- **Trading**: Use zone boundaries for support/resistance, stop placement
 
-**Price Zone Calculation**:
+**Price Zone vs Price Levels**:
 ```python
+# Zone calculation
 price_zone = (close_price // BIN_SIZE) * BIN_SIZE
-# Example: BIN_SIZE=10, price=95,647 → price_zone=95,640
+zone_price_min = price_zone
+zone_price_max = price_zone + BIN_SIZE
+
+# Example: BIN_SIZE=10, close=95,647
+# → price_zone = 95,640 (the bin)
+# → zone_price_min = 95,640.00 (lower boundary)
+# → zone_price_max = 95,650.00 (upper boundary)
+```
+
+**Use Cases**:
+```python
+# Filter all data within a specific price range
+df = pd.read_csv('features_15m_complete.csv')
+target_zone = df[(df['zone_price_min'] >= 95600) & (df['zone_price_max'] <= 95700)]
+
+# Find zones with high order toxicity
+toxic_zones = df[df['order_toxicity'] > 0.7][['price_zone', 'zone_price_min', 'zone_price_max']]
+
+# Calculate metrics per zone
+zone_metrics = df.groupby(['price_zone', 'zone_price_min', 'zone_price_max'])['CVD'].last()
 ```
 
 ---
