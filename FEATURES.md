@@ -535,11 +535,55 @@ For questions or issues:
 ## Version History
 
 - **v1.0**: Original buyer/seller detection
-- **v2.0**: Advanced Market Microstructure Analysis (current)
+- **v2.0**: Advanced Market Microstructure Analysis
   - +29 new functions
   - +20 new output files
   - +1,508 lines of code
   - +35% more information extracted
+- **v2.1**: Enhanced Price Magnets Analysis (current)
+  - Improved `analyze_price_magnets()` function
+  - Added minimum zone count validation (prevents sparse output)
+  - Added timestamp information (analysis period start/end/duration)
+  - Added comparative zone context (zones above/below each magnet)
+  - Added data quality rating (1-10 scale)
+  - Added zone position indicators (highest/lowest/rank)
+  - Added adaptive threshold logic to ensure meaningful output
+  - Enhanced output includes: zone_above, zone_below, distance metrics, quality ratings
+
+---
+
+## Enhanced Price Magnets Output
+
+The `zones_price_magnets.csv` file now includes comprehensive information:
+
+**Core Metrics** (existing):
+- price_zone, magnet_strength, touch_count, volume_score
+- aligned_with_buyers, aligned_with_sellers
+
+**New Additions**:
+- `analysis_period_start`: Earliest timestamp in analysis
+- `analysis_period_end`: Latest timestamp in analysis  
+- `analysis_duration_hours`: Duration of data analyzed
+- `zone_above`: Price level of next higher magnet zone
+- `zone_below`: Price level of next lower magnet zone
+- `distance_to_zone_above`: Distance to resistance
+- `distance_to_zone_below`: Distance to support
+- `is_highest_zone`: Boolean flag for top zone
+- `is_lowest_zone`: Boolean flag for bottom zone
+- `zone_rank`: Ranking by price (1 = lowest)
+- `magnet_quality_rating`: Data quality score (1-10)
+
+**Quality Rating Scale**:
+- 8-10: Excellent (high touches, high volume, full context)
+- 6-7: Good (adequate data, some context)
+- 4-5: Fair (limited data, minimal context)
+- 1-3: Poor (insufficient data for reliable analysis)
+
+**Validation**:
+- Minimum 5 zones required for full analysis
+- If fewer zones, all are returned with LOW_DATA rating
+- Adaptive threshold ensures at least 3 magnets when possible
+- Warnings printed when data quality is insufficient
 
 ---
 
