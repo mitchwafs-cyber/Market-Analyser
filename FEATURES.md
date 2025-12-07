@@ -572,6 +572,16 @@ The `zones_price_magnets.csv` file now includes comprehensive information:
 - `is_lowest_zone`: Boolean flag for bottom zone
 - `zone_rank`: Ranking by price (1 = lowest)
 - `magnet_quality_rating`: Data quality score (1-10)
+- `price_min`: **EXACT minimum price** observed in the zone
+- `price_max`: **EXACT maximum price** observed in the zone
+
+**Price Zone Explanation**:
+- `price_zone`: Zone bin center (e.g., 90.0 represents the 90-100 range with BIN_SIZE=10)
+- `price_min`/`price_max`: **Exact actual prices** from raw data within that zone
+- Example: If trades occurred at 92.5, 95.3, 97.8, then:
+  - `price_zone` = 90.0 (the bin)
+  - `price_min` = 92.5 (exact lowest price)
+  - `price_max` = 97.8 (exact highest price)
 
 **Quality Rating Scale**:
 - 8-10: Excellent (high touches, high volume, full context)

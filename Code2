@@ -1167,7 +1167,9 @@ def compute_zone_stats(df, bin_size=BIN_SIZE):
         total_sell_value=('sell_value','sum'),
         trades=('quantity','count'),
         first_time=('timestamp','min'),
-        last_time=('timestamp','max')
+        last_time=('timestamp','max'),
+        price_min=('price','min'),  # Add exact minimum price in zone
+        price_max=('price','max')   # Add exact maximum price in zone
     )
     grouped['total_vol'] = grouped['total_buy_vol'] + grouped['total_sell_vol']
     grouped['buy_imbalance_pct'] = 100 * grouped['total_buy_vol'] / grouped['total_vol'].replace(0, np.nan)
@@ -2207,8 +2209,19 @@ def identify_price_zones_of_interest(agg_data, price_bin_size=10.0):
         'volume': 'sum',
         'OFI': 'mean',
         'CVD': 'last',
-        'trade_count': 'sum'
+        'trade_count': 'sum',
+        'close': ['min', 'max']  # Add exact price tracking
     }).reset_index()
+    
+    # Flatten the multi-level columns from the aggregation
+    if isinstance(zone_analysis.columns, pd.MultiIndex):
+        zone_analysis.columns = ['price_zone', 'buy_value', 'sell_value', 'buy_vol', 'sell_vol', 
+                                 'volume', 'OFI', 'CVD', 'trade_count', 'price_min', 'price_max']
+    else:
+        # If no multi-level (shouldn't happen but defensive)
+        if 'price_min' not in zone_analysis.columns:
+            zone_analysis['price_min'] = zone_analysis['price_zone']
+            zone_analysis['price_max'] = zone_analysis['price_zone'] + price_bin_size
 
     zone_analysis['total_value'] = zone_analysis['buy_value'] + zone_analysis['sell_value']
     zone_analysis['net_value_flow'] = zone_analysis['buy_value'] - zone_analysis['sell_value']
@@ -2405,7 +2418,9 @@ def analyze_significant_zones_multi_timeframe(results_dict, price_bin_size=10.0)
         'buyer_score': 'mean',
         'seller_score': 'mean',
         'touch_count': 'sum',
-        'timeframe': lambda x: ','.join(x.unique())
+        'timeframe': lambda x: ','.join(x.unique()),
+        'price_min': 'min',  # Preserve exact minimum price in zone
+        'price_max': 'max'   # Preserve exact maximum price in zone
     }).reset_index()
     
     # Calculate final metrics
@@ -2503,6 +2518,10 @@ def analyze_price_magnets(zones_df, results_dict):
     """
     Identifies price magnets - levels that repeatedly attract price action.
     Enhanced to include timestamps, comparative zones, and minimum count validation.
+    
+    Note: price_zone represents the zone bin center (e.g., 90.0 for bin 90-100),
+    while price_min and price_max columns contain the exact minimum and maximum
+    prices observed within each zone during the analysis period.
     """
     print("\n" + "="*80)
     print("ANALYZING PRICE MAGNETS & ATTRACTION ZONES")
