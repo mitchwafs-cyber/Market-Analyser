@@ -1553,6 +1553,10 @@ def analyze_size_tier_intelligence(df, percentiles=[50, 90, 99]):
     
     df_work = df.copy()
     
+    # Ensure price_change column exists
+    if 'price_change' not in df_work.columns:
+        df_work['price_change'] = df_work['price'].diff().fillna(0.0)
+    
     # Calculate percentile thresholds
     p_values = [np.percentile(df_work['quantity'], p) for p in percentiles]
     
@@ -1605,11 +1609,13 @@ def analyze_size_tier_intelligence(df, percentiles=[50, 90, 99]):
         'quantity': ['sum', 'count'],
         'buy_vol': 'sum',
         'sell_vol': 'sum',
-        'timestamp': ['min', 'max']
+        'timestamp': ['min', 'max'],
+        'price': ['min', 'max', 'mean']
     }).reset_index()
     
     cluster_stats.columns = ['cluster_id', 'total_volume', 'trade_count', 
-                             'buy_vol', 'sell_vol', 'start_time', 'end_time']
+                             'buy_vol', 'sell_vol', 'start_time', 'end_time',
+                             'price_low', 'price_high', 'price_avg']
     
     # Filter significant clusters
     significant_clusters = cluster_stats[cluster_stats['trade_count'] >= 3].copy()
@@ -1618,6 +1624,7 @@ def analyze_size_tier_intelligence(df, percentiles=[50, 90, 99]):
         'LARGE_BUY_CLUSTER',
         'LARGE_SELL_CLUSTER'
     )
+    significant_clusters['price_range'] = significant_clusters['price_high'] - significant_clusters['price_low']
     
     scan_validator.record_analysis('Size-Tier Intelligence', len(df))
     
