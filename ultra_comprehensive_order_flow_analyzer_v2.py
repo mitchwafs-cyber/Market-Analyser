@@ -1860,9 +1860,13 @@ def analyze_volume_delta_shape(df, bar_period='1min'):
                          'delta', 'delta_skew', 'delta_kurtosis']
     
     # Add price information for each time bin
+    def get_first(x):
+        return x.iloc[0] if len(x) > 0 else np.nan
+    def get_last(x):
+        return x.iloc[-1] if len(x) > 0 else np.nan
+    
     price_per_bin = df_work.groupby('time_bin').agg({
-        'price': ['min', 'max', lambda x: x.iloc[0] if len(x) > 0 else np.nan, 
-                  lambda x: x.iloc[-1] if len(x) > 0 else np.nan, 'mean']
+        'price': ['min', 'max', get_first, get_last, 'mean']
     }).reset_index()
     price_per_bin.columns = ['time_bin', 'price_low', 'price_high', 'price_open', 'price_close', 'price_avg']
     bar_stats = bar_stats.merge(price_per_bin, on='time_bin', how='left')
@@ -1936,9 +1940,13 @@ def analyze_volume_delta_shape(df, bar_period='1min'):
                            'delta', 'delta_skew', 'delta_kurtosis']
     
     # Add OHLC data for each price bin
+    def get_first(x):
+        return x.iloc[0] if len(x) > 0 else np.nan
+    def get_last(x):
+        return x.iloc[-1] if len(x) > 0 else np.nan
+    
     price_ohlc = df_work.groupby('price_bin').agg({
-        'price': [lambda x: x.iloc[0] if len(x) > 0 else np.nan, 
-                  lambda x: x.iloc[-1] if len(x) > 0 else np.nan, 'min', 'max']
+        'price': [get_first, get_last, 'min', 'max']
     }).reset_index()
     price_ohlc.columns = ['price_bin', 'price_open', 'price_close', 'price_low', 'price_high']
     price_stats = price_stats.merge(price_ohlc, left_on='price', right_on='price_bin', how='left').drop('price_bin', axis=1)
@@ -2387,7 +2395,7 @@ def analyze_regime_volatility_coupling(df, vol_window=20):
     df_work.loc[df_work['strong_conviction'], 'regime'] = 'STRONG_CONVICTION'
     
     regime_summary = df_work.groupby('regime').agg({
-        'regime': 'count',
+        'timestamp': 'count',
         'price': ['min', 'max', 'mean']
     }).reset_index()
     regime_summary.columns = ['regime', 'count', 'price_low', 'price_high', 'price_avg']
