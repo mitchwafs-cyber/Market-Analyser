@@ -619,9 +619,18 @@ If zone analysis outputs contain only 1 zone (or very few zones), this indicates
 - Comprehensive warnings: Console alerts when zones < 3
 - Empty category handling: Returns empty DataFrames when no zones match criteria
 
+**Enhanced Handling (v2.4):**
+- **`identify_price_zones_of_interest()`** enhanced with warnings and adaptive thresholds
+- **`compute_zone_stats()`** enhanced with warnings and BIN_SIZE suggestions
+- Adaptive "significant zones" threshold: includes all zones if <= 3 detected
+- Ensures at least 20% of zones marked as significant (minimum 1)
+- Calculates and suggests optimal BIN_SIZE based on actual price range
+- Affects files: `price_zones_all.csv`, `price_zones_significant.csv`, `price_zones_trade_level.csv`
+
 **Action:**
 - Adjust BIN_SIZE in code (line 149): `BIN_SIZE = 5.0` or smaller
 - Verify data quality and price range before analysis
+- Check console warnings for suggested BIN_SIZE based on your data's price range
 
 ---
 

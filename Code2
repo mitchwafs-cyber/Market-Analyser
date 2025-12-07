@@ -1173,6 +1173,16 @@ def compute_zone_stats(df, bin_size=BIN_SIZE):
     )
     grouped['total_vol'] = grouped['total_buy_vol'] + grouped['total_sell_vol']
     grouped['buy_imbalance_pct'] = 100 * grouped['total_buy_vol'] / grouped['total_vol'].replace(0, np.nan)
+    
+    # Warning if very few zones at trade level
+    if len(grouped) <= 3:
+        print(f"\n⚠️  WARNING: compute_zone_stats() found only {len(grouped)} zone(s) at trade level!")
+        print(f"   BIN_SIZE={bin_size} may be too large for price range: "
+              f"${df_zone['price'].min():.2f} - ${df_zone['price'].max():.2f}")
+        print(f"   Price range: ${df_zone['price'].max() - df_zone['price'].min():.2f}")
+        print(f"   Suggested BIN_SIZE: {max(0.1, (df_zone['price'].max() - df_zone['price'].min()) / 20):.2f} "
+              f"(to get ~20 zones)\n")
+    
     return grouped.sort_values('total_buy_value', ascending=False)
 
 # -----------------------
@@ -2229,8 +2239,26 @@ def identify_price_zones_of_interest(agg_data, price_bin_size=10.0):
     total_vol_sum = zone_analysis['volume'].sum() if 'volume' in zone_analysis.columns else 1.0
     zone_analysis['volume_concentration'] = zone_analysis['volume'] / (total_vol_sum + 1e-9)
 
-    volume_threshold = zone_analysis['volume'].quantile(0.80) if not zone_analysis['volume'].empty else 0.0
+    # Warning if very few zones detected
+    if len(zone_analysis) <= 3:
+        print(f"\n⚠️  WARNING: identify_price_zones_of_interest() found only {len(zone_analysis)} zone(s)!")
+        print(f"   This may indicate BIN_SIZE ({price_bin_size}) is too large for the price range")
+        print(f"   Consider reducing BIN_SIZE for more granular zone analysis\n")
+
+    # Adaptive threshold: if we have very few zones, be more lenient
+    if len(zone_analysis) <= 3:
+        # With 3 or fewer zones, include all as "significant"
+        volume_threshold = zone_analysis['volume'].min()
+    else:
+        volume_threshold = zone_analysis['volume'].quantile(0.80) if not zone_analysis['volume'].empty else 0.0
+    
     significant_zones = zone_analysis[zone_analysis['volume'] >= volume_threshold].copy()
+    
+    # Ensure we have at least some significant zones if any zones exist
+    if significant_zones.empty and not zone_analysis.empty:
+        # If threshold filtered everything out, take top 20% or at least 1
+        n_zones = max(1, int(len(zone_analysis) * 0.2))
+        significant_zones = zone_analysis.nlargest(n_zones, 'volume').copy()
 
     def categorize_zone(row):
         if row['buy_pressure_ratio'] >= 0.6:
