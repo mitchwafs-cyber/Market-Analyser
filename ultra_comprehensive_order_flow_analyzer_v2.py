@@ -166,7 +166,10 @@ def save_output(df, filename, output_folder):
     
     try:
         # If DataFrame index is DatetimeIndex, include it as index in CSV
-        df.to_csv(filepath, index=True if isinstance(df.index, pd.DatetimeIndex) else False)
+        # Use float_format to ensure small decimal values aren't displayed as 0
+        df.to_csv(filepath, 
+                  index=True if isinstance(df.index, pd.DatetimeIndex) else False,
+                  float_format='%.8f')  # 8 decimal places for precision
         row_count = len(df)
         print(f"✓ Saved: {filename} ({row_count:,} rows)")
     except Exception as e:
@@ -1672,7 +1675,12 @@ def analyze_session_microstructure(df):
             continue
         
         # VWAP
-        vwap = (session_data['price'] * session_data['quantity']).sum() / (session_data['quantity'].sum() + 1e-9)
+        total_notional = (session_data['price'] * session_data['quantity']).sum()
+        total_quantity = session_data['quantity'].sum()
+        if total_quantity > 0:
+            vwap = total_notional / total_quantity
+        else:
+            vwap = session_data['price'].mean()  # Fallback to simple average
         
         # Volume profile for session
         # Adaptive bin size based on price range
