@@ -1377,14 +1377,15 @@ def calculate_impact_and_toxicity(df, window_sizes=[20, 50, 100]):
     
     scan_validator.record_analysis('Impact & Toxicity', len(df_work))
     
-    # Extract key metrics summary
+    # Extract key metrics summary with price information
     impact_summary = pd.DataFrame({
         'metric': [f'kyle_lambda_{w}_mean' for w in window_sizes] + 
                   [f'amihud_illiq_{w}_mean' for w in window_sizes] +
-                  ['vpin_refined_mean', 'vpin_spikes_count'],
+                  ['vpin_refined_mean', 'vpin_spikes_count', 'price_avg', 'price_low', 'price_high'],
         'value': [df_work[f'kyle_lambda_{w}'].mean() for w in window_sizes] +
                  [df_work[f'amihud_illiq_{w}'].mean() for w in window_sizes] +
-                 [df_work['vpin_refined'].mean(), df_work['vpin_spike_refined'].sum()]
+                 [df_work['vpin_refined'].mean(), df_work['vpin_spike_refined'].sum(),
+                  df_work['price'].mean(), df_work['price'].min(), df_work['price'].max()]
     })
     
     print(f"\n📊 Results:")
@@ -1599,11 +1600,13 @@ def analyze_size_tier_intelligence(df, percentiles=[50, 90, 99]):
         'quantity': ['sum', 'count', 'mean'],
         'buy_vol': 'sum',
         'sell_vol': 'sum',
-        'price_change': 'sum'
+        'price_change': 'sum',
+        'price': ['min', 'max', 'mean']
     }).reset_index()
     
     size_stats.columns = ['size_tier', 'total_volume', 'trade_count', 'avg_size', 
-                          'buy_volume', 'sell_volume', 'total_price_impact']
+                          'buy_volume', 'sell_volume', 'total_price_impact',
+                          'price_low', 'price_high', 'price_avg']
     
     # Volume share
     total_vol = size_stats['total_volume'].sum()
@@ -1856,6 +1859,14 @@ def analyze_volume_delta_shape(df, bar_period='1min'):
     bar_stats.columns = ['time_bin', 'volume', 'volume_skew', 'volume_kurtosis',
                          'delta', 'delta_skew', 'delta_kurtosis']
     
+    # Add price information for each time bin
+    price_per_bin = df_work.groupby('time_bin').agg({
+        'price': ['min', 'max', lambda x: x.iloc[0] if len(x) > 0 else np.nan, 
+                  lambda x: x.iloc[-1] if len(x) > 0 else np.nan, 'mean']
+    }).reset_index()
+    price_per_bin.columns = ['time_bin', 'price_low', 'price_high', 'price_open', 'price_close', 'price_avg']
+    bar_stats = bar_stats.merge(price_per_bin, on='time_bin', how='left')
+    
     # Cumulative delta for change-point detection
     bar_stats['cum_delta'] = bar_stats['delta'].cumsum()
     bar_stats['cum_delta_slope'] = bar_stats['cum_delta'].diff().fillna(0.0)
@@ -1924,6 +1935,14 @@ def analyze_volume_delta_shape(df, bar_period='1min'):
     price_stats.columns = ['price', 'volume', 'volume_skew', 'volume_kurtosis',
                            'delta', 'delta_skew', 'delta_kurtosis']
     
+    # Add OHLC data for each price bin
+    price_ohlc = df_work.groupby('price_bin').agg({
+        'price': [lambda x: x.iloc[0] if len(x) > 0 else np.nan, 
+                  lambda x: x.iloc[-1] if len(x) > 0 else np.nan, 'min', 'max']
+    }).reset_index()
+    price_ohlc.columns = ['price_bin', 'price_open', 'price_close', 'price_low', 'price_high']
+    price_stats = price_stats.merge(price_ohlc, left_on='price', right_on='price_bin', how='left').drop('price_bin', axis=1)
+    
     scan_validator.record_analysis('Volume/Delta Shape', len(df))
     
     print(f"\n📊 Results:")
@@ -1976,12 +1995,18 @@ def detect_liquidity_voids(df, void_threshold_percentile=10, min_void_levels=3):
                 void_start = void_levels[0]
                 void_end = void_levels[-1]
                 
+                # Get current price to calculate distances
+                current_price_val = df_work['price'].iloc[-1] if not df_work.empty else np.nan
+                
                 voids.append({
                     'void_start': void_start,
                     'void_end': void_end,
                     'void_width': void_end - void_start,
                     'void_levels': len(void_levels),
-                    'avg_volume': price_vol.iloc[void_start_idx:i]['quantity'].mean()
+                    'avg_volume': price_vol.iloc[void_start_idx:i]['quantity'].mean(),
+                    'price_mid': (void_start + void_end) / 2,
+                    'current_price': current_price_val,
+                    'distance_from_current': ((void_start + void_end) / 2) - current_price_val
                 })
         else:
             i += 1
@@ -2106,8 +2131,16 @@ def analyze_time_pace_diagnostics(df, aggressive_time_threshold=0.5, pulse_windo
     pulse_stats.columns = ['second_bin', 'trade_count', 'volume', 'buy_vol', 'sell_vol',
                            'price_start', 'price_end']
     
+    # Add price high/low for each pulse window
+    pulse_price_range = df_work.groupby('second_bin').agg({
+        'price': ['min', 'max', 'mean']
+    }).reset_index()
+    pulse_price_range.columns = ['second_bin', 'price_low', 'price_high', 'price_avg']
+    pulse_stats = pulse_stats.merge(pulse_price_range, on='second_bin', how='left')
+    
     pulse_stats['signed_volume'] = pulse_stats['buy_vol'] - pulse_stats['sell_vol']
     pulse_stats['price_change'] = pulse_stats['price_end'] - pulse_stats['price_start']
+    pulse_stats['price_range'] = pulse_stats['price_high'] - pulse_stats['price_low']
     
     # Pulse criteria: high trade count in 1s + significant signed volume
     pulse_count_threshold = pulse_stats['trade_count'].quantile(0.95)
@@ -2199,10 +2232,14 @@ def calculate_price_impact_asymmetry(df, vwap_data=None, poc_price=None):
         buy_trades['impact_per_unit'] = buy_trades['price_change'] / (buy_trades['buy_vol'] + 1e-9)
         try:
             # Use qcut for quantile-based binning to ensure balanced bins
-            buy_impact_by_distance = buy_trades.groupby(
-                pd.qcut(buy_trades['distance_from_vwap'], q=10, duplicates='drop')
-            )['impact_per_unit'].mean().reset_index()
-            buy_impact_by_distance.columns = ['distance_bucket', 'buy_impact']
+            buy_trades_binned = buy_trades.copy()
+            buy_trades_binned['distance_bucket'] = pd.qcut(buy_trades['distance_from_vwap'], q=10, duplicates='drop')
+            
+            buy_impact_by_distance = buy_trades_binned.groupby('distance_bucket').agg({
+                'impact_per_unit': 'mean',
+                'price': ['min', 'max', 'mean', 'count']
+            }).reset_index()
+            buy_impact_by_distance.columns = ['distance_bucket', 'buy_impact', 'price_low', 'price_high', 'price_avg', 'trade_count']
         except (ValueError, KeyError):
             # Fallback to regular cut if qcut fails
             buy_impact_by_distance = pd.DataFrame()
@@ -2215,10 +2252,14 @@ def calculate_price_impact_asymmetry(df, vwap_data=None, poc_price=None):
         sell_trades['impact_per_unit'] = sell_trades['price_change'] / (sell_trades['sell_vol'] + 1e-9)
         try:
             # Use qcut for quantile-based binning to ensure balanced bins
-            sell_impact_by_distance = sell_trades.groupby(
-                pd.qcut(sell_trades['distance_from_vwap'], q=10, duplicates='drop')
-            )['impact_per_unit'].mean().reset_index()
-            sell_impact_by_distance.columns = ['distance_bucket', 'sell_impact']
+            sell_trades_binned = sell_trades.copy()
+            sell_trades_binned['distance_bucket'] = pd.qcut(sell_trades['distance_from_vwap'], q=10, duplicates='drop')
+            
+            sell_impact_by_distance = sell_trades_binned.groupby('distance_bucket').agg({
+                'impact_per_unit': 'mean',
+                'price': ['min', 'max', 'mean', 'count']
+            }).reset_index()
+            sell_impact_by_distance.columns = ['distance_bucket', 'sell_impact', 'price_low', 'price_high', 'price_avg', 'trade_count']
         except (ValueError, KeyError):
             # Fallback to empty if qcut fails
             sell_impact_by_distance = pd.DataFrame()
@@ -2345,8 +2386,11 @@ def analyze_regime_volatility_coupling(df, vol_window=20):
     df_work.loc[df_work['thin_liq_squeeze'], 'regime'] = 'THIN_LIQ_SQUEEZE'
     df_work.loc[df_work['strong_conviction'], 'regime'] = 'STRONG_CONVICTION'
     
-    regime_summary = df_work['regime'].value_counts().reset_index()
-    regime_summary.columns = ['regime', 'count']
+    regime_summary = df_work.groupby('regime').agg({
+        'regime': 'count',
+        'price': ['min', 'max', 'mean']
+    }).reset_index()
+    regime_summary.columns = ['regime', 'count', 'price_low', 'price_high', 'price_avg']
     
     fake_moves = df_work[df_work['fake_move']].copy()
     thin_squeezes = df_work[df_work['thin_liq_squeeze']].copy()
