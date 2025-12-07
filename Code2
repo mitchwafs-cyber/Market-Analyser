@@ -3,7 +3,10 @@
 detect_buyers_enhanced.py -- PROFESSIONAL-GRADE ORDER FLOW ANALYZER
 Enhanced with comprehensive data validation, precision checks, and zero data loss guarantees.
 
-Features:
+ENHANCED VERSION - Advanced Market Microstructure Analysis
+This version includes ALL TIER 1, TIER 2, and TIER 3 features for institutional-grade analysis.
+
+Core Features:
 - Complete data integrity validation
 - Timestamp gap detection
 - Volume conservation checks
@@ -12,6 +15,94 @@ Features:
 - Adaptive thresholds
 - Confidence scoring
 - Anomaly detection
+
+TIER 1 - CRITICAL FEATURES:
+1. Trade Size Distribution Analysis
+   - XS_Retail → Mega_Whale classification
+   - Institutional footprint scoring
+   - Large trade clustering detection
+   
+2. Order Book Reconstruction & Depth
+   - Lee-Ready algorithm for spread estimation
+   - Kyle's Lambda (permanent price impact)
+   - Amihud illiquidity ratio
+   - Liquidity depth scores
+   - Microstructure noise quantification
+   
+3. Order Flow Toxicity & Information Content
+   - VPIN (Volume-Synchronized Probability of Informed Trading)
+   - Order toxicity index
+   - Adverse selection measurement
+   - Effective spread decomposition
+   
+4. Price Impact & Slippage Analysis
+   - Price impact per unit volume (signed & unsigned)
+   - Cumulative price impact tracking
+   - Trade velocity & acceleration
+   - Slippage from VWAP
+   
+5. Time-Based Patterns & Seasonality
+   - Intraday session analysis (Asian/European/US/Late_US)
+   - Session transition detection
+   - Hour/day/week patterns
+   - Cyclic time encoding (sin/cos)
+
+TIER 2 - HIGH VALUE FEATURES:
+6. Market Regime Detection
+   - Volatility regime classification (Low/Normal/High)
+   - Trend regime detection (ADX proxy)
+   - Volume regime identification
+   - Regime transition matrices
+   
+7. Multi-Timeframe Coherence
+   - Timeframe alignment scores
+   - Cross-timeframe correlation
+   - Signal confirmation across timeframes
+   - Fractal dimension calculation (Higuchi's method)
+   - Conflicting signal detection
+   
+8. Smart Money vs Dumb Money Detection
+   - Trade profitability analysis (forward 1, 5, 10, 30 periods)
+   - Smart Money Index (SMI)
+   - Leader-follower dynamics
+   - Informed trader activity scoring
+   
+9. Exhaustion & Reversal Detection
+   - Buyer/seller exhaustion scores
+   - Capitulation event detection
+   - Bullish/bearish divergence identification
+   - Volume-price divergences
+   
+10. Absorption & Iceberg Order Detection
+    - Absorption zone identification
+    - Iceberg order signatures
+    - Hidden liquidity detection
+    - Tape reading features
+
+TIER 3 - ADVANCED FEATURES:
+11. Additional Enhancements
+    - Trade sequence pattern analysis
+    - Aggression persistence (streaks)
+    - Size momentum tracking
+    - Pace acceleration
+
+OUTPUT FILES GENERATED:
+- trade_level_enhanced.csv - All raw trades with velocity, impact, spread, profitability
+- trade_size_distribution.csv - Volume/count by size class, institutional dominance
+- vpin_analysis.csv - Volume buckets, order imbalance, informed trading probability
+- iceberg_orders_detected.csv - Iceberg order clusters
+- institutional_activity.csv - Whale activity, footprint scores
+- timeframe_alignment.csv - Signal alignment, correlations, conflicts
+- cross_timeframe_correlations.csv - Correlation matrix
+- liquidity_metrics_[timeframe].csv - Kyle's Lambda, Amihud, toxicity
+- market_regimes_[timeframe].csv - Regime classification, transitions
+- session_analysis.csv - Intraday patterns, session transitions
+- smart_money_detection.csv - SMI, trade profitability, win rates
+- exhaustion_signals_[timeframe].csv - Exhaustion, capitulation, divergences
+- [All existing output files remain unchanged]
+
+Author: Enhanced by GitHub Copilot
+Version: 2.0 (Advanced Market Microstructure)
 """
 
 import os
@@ -79,7 +170,13 @@ class DataQualityReport:
             'classification_errors': 0,
             'low_confidence_bars': 0,
             'anomalies_detected': 0,
-            'warmup_bars_discarded': 0
+            'warmup_bars_discarded': 0,
+            'institutional_trades': 0,
+            'vpin_buckets': 0,
+            'iceberg_clusters': 0,
+            'capitulation_events': 0,
+            'regime_transitions': 0,
+            'absorption_zones': 0,
         }
         self.warnings = []
         self.errors = []
@@ -105,6 +202,14 @@ class DataQualityReport:
         print(f"✓ Low confidence bars: {self.metrics['low_confidence_bars']:,}")
         print(f"✓ Anomalies detected: {self.metrics['anomalies_detected']:,}")
         print(f"✓ Warmup bars discarded: {self.metrics['warmup_bars_discarded']:,}")
+        
+        print(f"\n🔥 ADVANCED FEATURES DETECTED:")
+        print(f"✓ Institutional trades: {self.metrics['institutional_trades']:,}")
+        print(f"✓ VPIN volume buckets: {self.metrics['vpin_buckets']:,}")
+        print(f"✓ Iceberg order clusters: {self.metrics['iceberg_clusters']:,}")
+        print(f"✓ Capitulation events: {self.metrics['capitulation_events']:,}")
+        print(f"✓ Regime transitions: {self.metrics['regime_transitions']:,}")
+        print(f"✓ Absorption zones: {self.metrics['absorption_zones']:,}")
         
         if self.metrics['volume_conservation']:
             print(f"\n📊 Volume Conservation Check:")
@@ -3306,17 +3411,29 @@ def process_single_file(zip_path, output_folder=OUTPUT_FOLDER):
     # 🔥 CALCULATE AND SAVE VPIN ANALYSIS
     print("💾 Calculating VPIN analysis...")
     vpin_data = calculate_vpin(raw, bucket_size=50)
+    quality_report.metrics['vpin_buckets'] = len(vpin_data)
     save_feature_output(vpin_data, "vpin_analysis", base_out)
     
     # 🔥 DETECT AND SAVE ICEBERG ORDERS
     print("💾 Detecting iceberg orders...")
     iceberg_data = detect_iceberg_orders(raw)
+    quality_report.metrics['iceberg_clusters'] = len(iceberg_data)
     save_feature_output(iceberg_data, "iceberg_orders_detected", base_out)
     
     # 🔥 INSTITUTIONAL ACTIVITY ANALYSIS
     print("💾 Analyzing institutional activity...")
     institutional_data = detect_institutional_footprint(raw, timeframe='1min')
+    if 'is_institutional' in raw.columns:
+        quality_report.metrics['institutional_trades'] = raw['is_institutional'].sum()
     save_feature_output(institutional_data, "institutional_activity", base_out)
+    
+    # Track advanced feature detection
+    if 'capitulation_event' in agg15_full.columns:
+        quality_report.metrics['capitulation_events'] = (agg15_full['capitulation_event'] != 0).sum()
+    if 'regime_transition' in agg15_full.columns:
+        quality_report.metrics['regime_transitions'] = agg15_full['regime_transition'].sum()
+    if 'is_absorption_zone' in agg15_full.columns:
+        quality_report.metrics['absorption_zones'] = agg15_full['is_absorption_zone'].sum()
     
     # 🔥 TIMEFRAME ALIGNMENT ANALYSIS
     print("💾 Calculating timeframe alignment...")
