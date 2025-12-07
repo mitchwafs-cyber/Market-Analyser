@@ -1336,12 +1336,20 @@ def calculate_impact_and_toxicity(df, window_sizes=[20, 50, 100]):
     df_work['dynamic_bucket_size'] = np.sqrt(recent_vol_mean).fillna(50.0)
     
     # Calculate VPIN per dynamic bucket
-    # NOTE: This loop is necessary for dynamic bucket sizing based on recent volume
-    # For very large datasets, consider sampling or parallel processing if performance is critical
+    # NOTE: This loop iterates through all rows. For datasets >100K rows, this can take 5-30+ minutes.
+    # Progress is printed every 10% to show it's working.
     df_work['cumulative_vol'] = df_work['quantity'].cumsum()
     vpin_refined = []
     
+    total_rows = len(df_work)
+    print(f"  ⏳ Calculating VPIN for {total_rows:,} rows (this may take time for large datasets)...")
+    progress_step = max(1, total_rows // 10)  # Print progress every 10%
+    
     for i in range(len(df_work)):
+        if i > 0 and i % progress_step == 0:
+            pct = int(100 * i / total_rows)
+            print(f"     {pct}% complete ({i:,}/{total_rows:,} rows)...")
+        
         bucket_size = max(10.0, df_work.iloc[i]['dynamic_bucket_size'])
         start_idx = max(0, i - int(bucket_size))
         bucket_data = df_work.iloc[start_idx:i+1]
