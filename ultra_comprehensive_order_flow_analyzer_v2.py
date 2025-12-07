@@ -2034,9 +2034,41 @@ def analyze_time_pace_diagnostics(df, aggressive_time_threshold=0.5, pulse_windo
     # Run-length of aggressive prints
     df_work['aggressive_group'] = (~df_work['is_aggressive']).cumsum()
     
-    run_lengths = df_work[df_work['is_aggressive']].groupby('aggressive_group').size().reset_index()
-    run_lengths.columns = ['group', 'run_length']
-    run_lengths = run_lengths[run_lengths['run_length'] >= 5]  # Significant runs
+    # Calculate detailed run statistics with timestamps, side, volumes, prices
+    aggressive_runs = []
+    for group in df_work[df_work['is_aggressive']]['aggressive_group'].unique():
+        run_data = df_work[
+            (df_work['is_aggressive']) & 
+            (df_work['aggressive_group'] == group)
+        ]
+        
+        if len(run_data) >= 5:  # Significant runs only
+            # Determine dominant side (buy or sell)
+            buy_vol = run_data['buy_vol'].sum()
+            sell_vol = run_data['sell_vol'].sum()
+            dominant_side = 'BUY' if buy_vol > sell_vol else 'SELL'
+            
+            aggressive_runs.append({
+                'run_id': group,
+                'run_length': len(run_data),
+                'start_time': run_data['timestamp'].iloc[0],
+                'end_time': run_data['timestamp'].iloc[-1],
+                'duration_seconds': (run_data['timestamp'].iloc[-1] - run_data['timestamp'].iloc[0]).total_seconds(),
+                'dominant_side': dominant_side,
+                'total_volume': run_data['quantity'].sum(),
+                'buy_volume': buy_vol,
+                'sell_volume': sell_vol,
+                'signed_volume': buy_vol - sell_vol,
+                'price_start': run_data['price'].iloc[0],
+                'price_end': run_data['price'].iloc[-1],
+                'price_low': run_data['price'].min(),
+                'price_high': run_data['price'].max(),
+                'price_range': run_data['price'].max() - run_data['price'].min(),
+                'price_change': run_data['price'].iloc[-1] - run_data['price'].iloc[0],
+                'avg_time_between_trades': run_data['time_diff'].mean()
+            })
+    
+    run_lengths = pd.DataFrame(aggressive_runs)
     
     # Burstiness: CV of inter-trade times
     # Calculate over rolling windows
@@ -2089,6 +2121,11 @@ def analyze_time_pace_diagnostics(df, aggressive_time_threshold=0.5, pulse_windo
     
     print(f"\n📊 Results:")
     print(f"  • Aggressive print runs (5+): {len(run_lengths)}")
+    if not run_lengths.empty:
+        print(f"    - Buy-dominated runs: {(run_lengths['dominant_side'] == 'BUY').sum()}")
+        print(f"    - Sell-dominated runs: {(run_lengths['dominant_side'] == 'SELL').sum()}")
+        print(f"    - Avg run length: {run_lengths['run_length'].mean():.1f} trades")
+        print(f"    - Avg run duration: {run_lengths['duration_seconds'].mean():.2f}s")
     print(f"  • High burstiness periods: {df_work['high_burstiness'].sum()}")
     print(f"  • Pulses detected: {len(pulses)}")
     if not pulses.empty:
@@ -2581,8 +2618,10 @@ def run_ultra_comprehensive_analysis(zip_path, output_folder):
     pace_results = analyze_time_pace_diagnostics(df)
     if pace_results:
         results['pace_diagnostics'] = pace_results
-        save_output(pace_results['aggressive_runs'], '50_aggressive_print_runs.csv', output_dir)
-        save_output(pace_results['pulse_events'], '51_pulse_events.csv', output_dir)
+        if not pace_results['aggressive_runs'].empty:
+            save_output(pace_results['aggressive_runs'], '50_aggressive_print_runs.csv', output_dir)
+        if not pace_results['pulse_events'].empty:
+            save_output(pace_results['pulse_events'], '51_pulse_events.csv', output_dir)
     
     # 9. Price-Impact Asymmetry
     # Get VWAP and POC from previous analyses
