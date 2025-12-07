@@ -595,6 +595,34 @@ The `zones_price_magnets.csv` file now includes comprehensive information:
 - Adaptive threshold ensures at least 3 magnets when possible
 - Warnings printed when data quality is insufficient
 
+**Troubleshooting: Single Zone Issue**
+
+If zone analysis outputs contain only 1 zone (or very few zones), this indicates:
+
+**Causes:**
+1. **BIN_SIZE too large**: Default BIN_SIZE=10.0 may be too large for the price range
+   - If BTC trades between 95,000-96,000, a 10.0 bin covers only 10 price points
+   - Solution: Reduce BIN_SIZE to 5.0, 1.0, or even 0.1 depending on asset
+   
+2. **Limited price movement**: Data shows very little price variation
+   - Check if data is from a consolidation period
+   - Verify data spans sufficient time/bars
+   
+3. **Insufficient data**: Not enough bars across timeframes
+   - Ensure data includes multiple timeframes (1m, 5m, 15m, 1h, 4h)
+   - Verify each timeframe has actual data
+
+**Enhanced Handling (v2.3):**
+- Safe normalization: Prevents division-by-zero when min==max
+- Adaptive thresholds: Uses min(top_n, available_zones)
+- Single-zone tier assignment: Assigns TIER_1_CRITICAL to single zones
+- Comprehensive warnings: Console alerts when zones < 3
+- Empty category handling: Returns empty DataFrames when no zones match criteria
+
+**Action:**
+- Adjust BIN_SIZE in code (line 149): `BIN_SIZE = 5.0` or smaller
+- Verify data quality and price range before analysis
+
 ---
 
 **Last Updated**: 2025-12-07

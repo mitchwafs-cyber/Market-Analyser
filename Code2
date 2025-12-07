@@ -2430,11 +2430,24 @@ def analyze_significant_zones_multi_timeframe(results_dict, price_bin_size=10.0)
     final_zones['dominance'] = final_zones['buy_vol'] - final_zones['sell_vol']
     
     # Calculate importance score (multi-factor)
-    final_zones['volume_score'] = (final_zones['volume'] - final_zones['volume'].min()) / (final_zones['volume'].max() - final_zones['volume'].min() + 1e-9)
-    final_zones['value_score'] = (final_zones['total_value'] - final_zones['total_value'].min()) / (final_zones['total_value'].max() - final_zones['total_value'].min() + 1e-9)
-    final_zones['touch_score'] = (final_zones['touch_count'] - final_zones['touch_count'].min()) / (final_zones['touch_count'].max() - final_zones['touch_count'].min() + 1e-9)
-    final_zones['buyer_score_norm'] = (final_zones['buyer_score'] - final_zones['buyer_score'].min()) / (final_zones['buyer_score'].max() - final_zones['buyer_score'].min() + 1e-9)
-    final_zones['seller_score_norm'] = (final_zones['seller_score'] - final_zones['seller_score'].min()) / (final_zones['seller_score'].max() - final_zones['seller_score'].min() + 1e-9)
+    # Handle case where we have only 1 zone (min == max causes division issues)
+    def safe_normalize(series):
+        """Normalize series to 0-1 range, handling single-value edge case"""
+        min_val = series.min()
+        max_val = series.max()
+        range_val = max_val - min_val
+        
+        if range_val < 1e-6:  # Essentially zero range (single zone or all same values)
+            # Return middle score (0.5) for all if no variation
+            return pd.Series(0.5, index=series.index)
+        else:
+            return (series - min_val) / range_val
+    
+    final_zones['volume_score'] = safe_normalize(final_zones['volume'])
+    final_zones['value_score'] = safe_normalize(final_zones['total_value'])
+    final_zones['touch_score'] = safe_normalize(final_zones['touch_count'])
+    final_zones['buyer_score_norm'] = safe_normalize(final_zones['buyer_score'])
+    final_zones['seller_score_norm'] = safe_normalize(final_zones['seller_score'])
     
     # Composite importance score
     final_zones['importance_score'] = (
@@ -2465,6 +2478,18 @@ def analyze_significant_zones_multi_timeframe(results_dict, price_bin_size=10.0)
     
     print(f"✓ Consolidated into {len(final_zones)} unique price zones")
     
+    # Warn if very few zones detected
+    if len(final_zones) <= 3:
+        print(f"\n⚠️  WARNING: Only {len(final_zones)} zone(s) detected!")
+        print(f"   This may indicate:")
+        print(f"   - Very limited price movement in the data")
+        print(f"   - BIN_SIZE ({price_bin_size}) is too large for the price range")
+        print(f"   - Insufficient data across timeframes")
+        print(f"   Consider:")
+        print(f"   - Using a smaller BIN_SIZE (e.g., 5.0 or 1.0)")
+        print(f"   - Checking if data spans sufficient price levels")
+        print(f"   - Verifying all timeframes have data\n")
+    
     return final_zones
 
 def identify_key_levels(zones_df, top_n=10):
@@ -2486,25 +2511,45 @@ def identify_key_levels(zones_df, top_n=10):
     
     df = zones_df.copy()
     
+    # Warning if very few zones
+    if len(df) <= 3:
+        print(f"\n⚠️  WARNING: Only {len(df)} zone(s) available for key level identification")
+        print(f"   Key level analysis requires diverse zones for meaningful results\n")
+    
     # 1. Top Support Levels (Strong Buy Zones)
-    support = df[df['zone_type'].str.contains('BUY', na=False)].nlargest(top_n, 'importance_score')
-    print(f"\n✓ Top {len(support)} Support Levels (Buy Zones)")
+    support_candidates = df[df['zone_type'].str.contains('BUY', na=False)]
+    if len(support_candidates) == 0:
+        print(f"\n⚠️  No BUY zones found - cannot identify support levels")
+        support = pd.DataFrame()
+    else:
+        support = support_candidates.nlargest(min(top_n, len(support_candidates)), 'importance_score')
+        print(f"\n✓ Top {len(support)} Support Levels (Buy Zones)")
     
     # 2. Top Resistance Levels (Strong Sell Zones)
-    resistance = df[df['zone_type'].str.contains('SELL', na=False)].nlargest(top_n, 'importance_score')
-    print(f"✓ Top {len(resistance)} Resistance Levels (Sell Zones)")
+    resistance_candidates = df[df['zone_type'].str.contains('SELL', na=False)]
+    if len(resistance_candidates) == 0:
+        print(f"⚠️  No SELL zones found - cannot identify resistance levels")
+        resistance = pd.DataFrame()
+    else:
+        resistance = resistance_candidates.nlargest(min(top_n, len(resistance_candidates)), 'importance_score')
+        print(f"✓ Top {len(resistance)} Resistance Levels (Sell Zones)")
     
     # 3. High Volume Zones (most traded)
-    high_volume = df.nlargest(top_n, 'volume')
+    high_volume = df.nlargest(min(top_n, len(df)), 'volume')
     print(f"✓ Top {len(high_volume)} High Volume Zones")
     
     # 4. High Value Zones (most dollar flow)
-    high_value = df.nlargest(top_n, 'total_value')
+    high_value = df.nlargest(min(top_n, len(df)), 'total_value')
     print(f"✓ Top {len(high_value)} High Value Zones")
     
     # 5. Potential Reversal Zones (neutral with high activity)
-    reversal = df[df['zone_type'] == 'NEUTRAL'].nlargest(top_n, 'importance_score')
-    print(f"✓ Top {len(reversal)} Potential Reversal Zones")
+    reversal_candidates = df[df['zone_type'] == 'NEUTRAL']
+    if len(reversal_candidates) == 0:
+        print(f"⚠️  No NEUTRAL zones found - cannot identify reversal zones")
+        reversal = pd.DataFrame()
+    else:
+        reversal = reversal_candidates.nlargest(min(top_n, len(reversal_candidates)), 'importance_score')
+        print(f"✓ Top {len(reversal)} Potential Reversal Zones")
     
     return {
         'top_support': support,
@@ -2666,19 +2711,35 @@ def create_zone_hierarchy(zones_df):
     
     df = zones_df.copy()
     
+    # Warning if very few zones
+    if len(df) <= 3:
+        print(f"⚠️  Only {len(df)} zone(s) - hierarchy analysis limited\n")
+    
     # Define tiers based on importance score
-    importance_q66 = df['importance_score'].quantile(0.66)
-    importance_q33 = df['importance_score'].quantile(0.33)
-    
-    def assign_tier(score):
-        if score >= importance_q66:
-            return 'TIER_1_CRITICAL'
-        elif score >= importance_q33:
-            return 'TIER_2_IMPORTANT'
-        else:
-            return 'TIER_3_MINOR'
-    
-    df['tier'] = df['importance_score'].apply(assign_tier)
+    # Handle single-zone edge case where quantiles would be identical
+    if len(df) == 1:
+        # Single zone: always assign to TIER_1_CRITICAL
+        df['tier'] = 'TIER_1_CRITICAL'
+    elif len(df) == 2:
+        # Two zones: assign based on which is higher
+        median_score = df['importance_score'].median()
+        df['tier'] = df['importance_score'].apply(
+            lambda x: 'TIER_1_CRITICAL' if x >= median_score else 'TIER_2_IMPORTANT'
+        )
+    else:
+        # Three or more zones: use quantile-based assignment
+        importance_q66 = df['importance_score'].quantile(0.66)
+        importance_q33 = df['importance_score'].quantile(0.33)
+        
+        def assign_tier(score):
+            if score >= importance_q66:
+                return 'TIER_1_CRITICAL'
+            elif score >= importance_q33:
+                return 'TIER_2_IMPORTANT'
+            else:
+                return 'TIER_3_MINOR'
+        
+        df['tier'] = df['importance_score'].apply(assign_tier)
     
     # Count by tier and type
     hierarchy = df.groupby(['tier', 'zone_type']).agg({
