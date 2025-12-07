@@ -1659,7 +1659,24 @@ def analyze_session_microstructure(df):
         vwap = (session_data['price'] * session_data['quantity']).sum() / (session_data['quantity'].sum() + 1e-9)
         
         # Volume profile for session
-        session_data['price_bin'] = (session_data['price'] // 1.0) * 1.0
+        # Adaptive bin size based on price range
+        price_range = session_data['price'].max() - session_data['price'].min()
+        if price_range > 0:
+            # Use tick size that creates ~100-200 bins
+            tick_size = max(0.0001, price_range / 150.0)
+            # Round to sensible decimal places
+            if tick_size >= 1:
+                tick_size = round(tick_size)
+            elif tick_size >= 0.1:
+                tick_size = round(tick_size, 1)
+            elif tick_size >= 0.01:
+                tick_size = round(tick_size, 2)
+            else:
+                tick_size = round(tick_size, 4)
+        else:
+            tick_size = 0.01  # Default for very narrow ranges
+        
+        session_data['price_bin'] = (session_data['price'] // tick_size) * tick_size
         profile = session_data.groupby('price_bin')['quantity'].sum().reset_index()
         profile.columns = ['price', 'volume']
         profile = profile.sort_values('volume', ascending=False)
