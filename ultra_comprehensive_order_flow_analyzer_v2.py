@@ -2076,9 +2076,16 @@ def calculate_price_impact_asymmetry(df, vwap_data=None, poc_price=None):
     if vwap_data is None:
         vwap = (df_work['price'] * df_work['quantity']).cumsum() / df_work['quantity'].cumsum()
     else:
-        vwap = vwap_data.get('vwap', df_work['price'].mean())
-        if isinstance(vwap, pd.Series):
-            vwap = vwap.iloc[-1] if len(vwap) > 0 else df_work['price'].mean()
+        # Handle both dict and scalar inputs
+        if isinstance(vwap_data, dict):
+            vwap = vwap_data.get('vwap', df_work['price'].mean())
+            if isinstance(vwap, pd.Series):
+                vwap = vwap.iloc[-1] if len(vwap) > 0 else df_work['price'].mean()
+        elif isinstance(vwap_data, pd.Series):
+            vwap = vwap_data.iloc[-1] if len(vwap_data) > 0 else df_work['price'].mean()
+        else:
+            # Scalar value (float, int, numpy.float64, etc.)
+            vwap = vwap_data
     
     # Calculate POC if not provided
     if poc_price is None:
