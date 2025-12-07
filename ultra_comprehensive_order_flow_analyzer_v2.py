@@ -1297,10 +1297,19 @@ def calculate_impact_and_toxicity(df, window_sizes=[20, 50, 100]):
     df_work['price_change'] = df_work['price'].diff().fillna(0.0)
     
     # Kyle lambda over different windows
+    # Kyle's lambda measures price impact: λ = ΔP / signed_volume
+    # Do NOT use abs() - sign indicates whether buys or sells drove the price change
     for window in window_sizes:
         rolling_price_change = df_work['price_change'].rolling(window, min_periods=1).sum()
         rolling_signed_vol = df_work['signed_volume'].rolling(window, min_periods=1).sum()
-        df_work[f'kyle_lambda_{window}'] = rolling_price_change / (rolling_signed_vol.abs() + 1e-9)
+        # When signed_vol > 0 (net buying) and price increases (ΔP > 0): λ > 0 (buys push price up)
+        # When signed_vol < 0 (net selling) and price decreases (ΔP < 0): λ > 0 (sells push price down)
+        # Preserve sign to maintain directional information
+        df_work[f'kyle_lambda_{window}'] = np.where(
+            rolling_signed_vol.abs() < 1e-6,  # Avoid division by near-zero
+            0.0,
+            rolling_price_change / rolling_signed_vol
+        )
     
     # Amihud illiquidity: |returns| / dollar_volume
     df_work['returns'] = df_work['price'].pct_change().fillna(0.0)
