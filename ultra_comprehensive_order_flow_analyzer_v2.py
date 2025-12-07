@@ -1260,6 +1260,11 @@ def calculate_vpin(df, bucket_size=VPIN_BUCKET_SIZE):
             'timestamp': bucket_df['timestamp'].iloc[-1],
             'vpin': vpin,
             'total_volume': total_vol,
+            'price_low': bucket_df['price'].min(),
+            'price_high': bucket_df['price'].max(),
+            'price_open': bucket_df['price'].iloc[0],
+            'price_close': bucket_df['price'].iloc[-1],
+            'price_avg': bucket_df['price'].mean(),
             'price_range': bucket_df['price'].max() - bucket_df['price'].min(),
             'toxicity_level': 'HIGH' if vpin > 0.6 else 'MEDIUM' if vpin > 0.4 else 'LOW'
         })
