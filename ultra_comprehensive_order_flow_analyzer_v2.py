@@ -1861,6 +1861,33 @@ def analyze_volume_delta_shape(df, bar_period='1min'):
     
     changepoints = bar_stats[bar_stats['significant_changepoint']].copy()
     
+    # Add price information for each changepoint
+    if not changepoints.empty:
+        # For each changepoint time bin, get price statistics from that period
+        price_info = []
+        for idx, row in changepoints.iterrows():
+            time_bin = row['time_bin']
+            bin_data = df_work[df_work['time_bin'] == time_bin]
+            if not bin_data.empty:
+                price_info.append({
+                    'price_low': bin_data['price'].min(),
+                    'price_high': bin_data['price'].max(),
+                    'price_open': bin_data['price'].iloc[0],
+                    'price_close': bin_data['price'].iloc[-1],
+                    'price_avg': bin_data['price'].mean()
+                })
+            else:
+                price_info.append({
+                    'price_low': np.nan,
+                    'price_high': np.nan,
+                    'price_open': np.nan,
+                    'price_close': np.nan,
+                    'price_avg': np.nan
+                })
+        
+        price_df = pd.DataFrame(price_info)
+        changepoints = pd.concat([changepoints.reset_index(drop=True), price_df], axis=1)
+    
     # Price bin shape analysis
     df_work['price_bin'] = (df_work['price'] // 1.0) * 1.0
     
