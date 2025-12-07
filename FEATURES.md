@@ -7,10 +7,31 @@ This document describes all the advanced features implemented in Code2 for insti
 
 ### Total Enhancement Statistics
 - **Original Code**: 2,262 lines
-- **Enhanced Code**: 3,770 lines (+1,508 lines, +66.7%)
+- **Enhanced Code**: 3,960 lines (+1,698 lines, +75.1%)
 - **New Functions Added**: 29 specialized analysis functions
-- **Total Functions**: 71 functions
+- **Total Functions**: 72 functions
 - **New Output Files**: 20+ new CSV files per analysis run
+
+### Universal Price Zone Tracking (v2.5)
+**ALL output files now include `price_zone` column** for spatial analysis:
+- `features_[1m/5m/15m/1h/4h]_complete.csv` - All timeframe features tagged with zones
+- `features_15m_buyer_scored.csv` / `features_15m_seller_scored.csv` - Session-scored data
+- `anomalies_ml_15m.csv` - ML-detected anomalies with price context
+- `trade_level_enhanced.csv` - Every raw trade tagged with its zone
+- Plus all existing zone-specific files
+
+**Benefits**:
+- Understand behavior at each price level across all analyses
+- Compare metrics across different price zones
+- Identify zone-specific patterns (e.g., high VPIN in certain zones)
+- Correlation between price levels and order flow dynamics
+- Enables zone-based filtering and aggregation of any metric
+
+**Price Zone Calculation**:
+```python
+price_zone = (close_price // BIN_SIZE) * BIN_SIZE
+# Example: BIN_SIZE=10, price=95,647 → price_zone=95,640
+```
 
 ---
 

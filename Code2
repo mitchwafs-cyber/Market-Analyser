@@ -3498,6 +3498,14 @@ def process_single_file(zip_path, output_folder=OUTPUT_FOLDER):
     print("STEP 4: SAVING ALL TIMEFRAME FEATURES")
     print("="*80)
     
+    # 🔥 ADD PRICE ZONES TO ALL TIMEFRAMES
+    # This allows understanding what was happening at each price zone
+    for df_name, df in [('agg1m_full', agg1m_full), ('agg5m_full', agg5m_full), 
+                        ('agg15_full', agg15_full), ('agg1h_full', agg1h_full), 
+                        ('agg4h_full', agg4h_full)]:
+        if df is not None and not df.empty and 'close' in df.columns:
+            df['price_zone'] = (df['close'] // BIN_SIZE) * BIN_SIZE
+    
     # 🔥 SAVE ALL TIMEFRAME FEATURES
     base_name = os.path.splitext(os.path.basename(zip_path))[0]
     base_out = os.path.join(output_folder, base_name)
@@ -3521,6 +3529,12 @@ def process_single_file(zip_path, output_folder=OUTPUT_FOLDER):
     print(f"✓ Detected {len(buyer_sessions)} buyer sessions")
     print(f"✓ Detected {len(seller_sessions)} seller sessions")
 
+    # 🔥 ADD PRICE ZONES TO SCORED FEATURES
+    if not agg15_scored_buy.empty and 'close' in agg15_scored_buy.columns:
+        agg15_scored_buy['price_zone'] = (agg15_scored_buy['close'] // BIN_SIZE) * BIN_SIZE
+    if not agg15_scored_seller.empty and 'close' in agg15_scored_seller.columns:
+        agg15_scored_seller['price_zone'] = (agg15_scored_seller['close'] // BIN_SIZE) * BIN_SIZE
+
     # 🔥 SAVE 15M BUYER & SELLER SCORED FEATURES
     save_feature_output(agg15_scored_buy, "features_15m_buyer_scored", base_out)
     save_feature_output(agg15_scored_seller, "features_15m_seller_scored", base_out)
@@ -3533,6 +3547,10 @@ def process_single_file(zip_path, output_folder=OUTPUT_FOLDER):
     agg15_ml = ml_anomaly_detection(agg15_scored_buy)
     anomaly_count = agg15_ml['is_ml_anomaly'].sum() if 'is_ml_anomaly' in agg15_ml.columns else 0
     print(f"✓ Detected {anomaly_count} anomalies")
+    
+    # 🔥 ADD PRICE ZONE TO ANOMALY OUTPUT
+    if not agg15_ml.empty and 'close' in agg15_ml.columns:
+        agg15_ml['price_zone'] = (agg15_ml['close'] // BIN_SIZE) * BIN_SIZE
     
     # 🔥 SAVE ML ANOMALY OUTPUT
     save_feature_output(agg15_ml, "anomalies_ml_15m", base_out)
@@ -3606,6 +3624,11 @@ def process_single_file(zip_path, output_folder=OUTPUT_FOLDER):
     print("\n" + "="*80)
     print("STEP 11: ADVANCED ANALYTICS & NEW OUTPUTS")
     print("="*80)
+    
+    # 🔥 ADD PRICE ZONE TO RAW TRADES
+    # This allows understanding what was happening at each price zone at trade level
+    if 'price' in raw.columns:
+        raw['price_zone'] = (raw['price'] // BIN_SIZE) * BIN_SIZE
     
     # 🔥 SAVE ENHANCED TRADE-LEVEL DATA
     print("💾 Saving enhanced trade-level data...")
