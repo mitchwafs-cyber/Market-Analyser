@@ -3,7 +3,10 @@
 detect_buyers_enhanced.py -- PROFESSIONAL-GRADE ORDER FLOW ANALYZER
 Enhanced with comprehensive data validation, precision checks, and zero data loss guarantees.
 
-Features:
+ENHANCED VERSION - Advanced Market Microstructure Analysis
+This version includes ALL TIER 1, TIER 2, and TIER 3 features for institutional-grade analysis.
+
+Core Features:
 - Complete data integrity validation
 - Timestamp gap detection
 - Volume conservation checks
@@ -12,6 +15,94 @@ Features:
 - Adaptive thresholds
 - Confidence scoring
 - Anomaly detection
+
+TIER 1 - CRITICAL FEATURES:
+1. Trade Size Distribution Analysis
+   - XS_Retail → Mega_Whale classification
+   - Institutional footprint scoring
+   - Large trade clustering detection
+   
+2. Order Book Reconstruction & Depth
+   - Lee-Ready algorithm for spread estimation
+   - Kyle's Lambda (permanent price impact)
+   - Amihud illiquidity ratio
+   - Liquidity depth scores
+   - Microstructure noise quantification
+   
+3. Order Flow Toxicity & Information Content
+   - VPIN (Volume-Synchronized Probability of Informed Trading)
+   - Order toxicity index
+   - Adverse selection measurement
+   - Effective spread decomposition
+   
+4. Price Impact & Slippage Analysis
+   - Price impact per unit volume (signed & unsigned)
+   - Cumulative price impact tracking
+   - Trade velocity & acceleration
+   - Slippage from VWAP
+   
+5. Time-Based Patterns & Seasonality
+   - Intraday session analysis (Asian/European/US/Late_US)
+   - Session transition detection
+   - Hour/day/week patterns
+   - Cyclic time encoding (sin/cos)
+
+TIER 2 - HIGH VALUE FEATURES:
+6. Market Regime Detection
+   - Volatility regime classification (Low/Normal/High)
+   - Trend regime detection (ADX proxy)
+   - Volume regime identification
+   - Regime transition matrices
+   
+7. Multi-Timeframe Coherence
+   - Timeframe alignment scores
+   - Cross-timeframe correlation
+   - Signal confirmation across timeframes
+   - Fractal dimension calculation (Higuchi's method)
+   - Conflicting signal detection
+   
+8. Smart Money vs Dumb Money Detection
+   - Trade profitability analysis (forward 1, 5, 10, 30 periods)
+   - Smart Money Index (SMI)
+   - Leader-follower dynamics
+   - Informed trader activity scoring
+   
+9. Exhaustion & Reversal Detection
+   - Buyer/seller exhaustion scores
+   - Capitulation event detection
+   - Bullish/bearish divergence identification
+   - Volume-price divergences
+   
+10. Absorption & Iceberg Order Detection
+    - Absorption zone identification
+    - Iceberg order signatures
+    - Hidden liquidity detection
+    - Tape reading features
+
+TIER 3 - ADVANCED FEATURES:
+11. Additional Enhancements
+    - Trade sequence pattern analysis
+    - Aggression persistence (streaks)
+    - Size momentum tracking
+    - Pace acceleration
+
+OUTPUT FILES GENERATED:
+- trade_level_enhanced.csv - All raw trades with velocity, impact, spread, profitability
+- trade_size_distribution.csv - Volume/count by size class, institutional dominance
+- vpin_analysis.csv - Volume buckets, order imbalance, informed trading probability
+- iceberg_orders_detected.csv - Iceberg order clusters
+- institutional_activity.csv - Whale activity, footprint scores
+- timeframe_alignment.csv - Signal alignment, correlations, conflicts
+- cross_timeframe_correlations.csv - Correlation matrix
+- liquidity_metrics_[timeframe].csv - Kyle's Lambda, Amihud, toxicity
+- market_regimes_[timeframe].csv - Regime classification, transitions
+- session_analysis.csv - Intraday patterns, session transitions
+- smart_money_detection.csv - SMI, trade profitability, win rates
+- exhaustion_signals_[timeframe].csv - Exhaustion, capitulation, divergences
+- [All existing output files remain unchanged]
+
+Author: Enhanced by GitHub Copilot
+Version: 2.0 (Advanced Market Microstructure)
 """
 
 import os
@@ -79,7 +170,13 @@ class DataQualityReport:
             'classification_errors': 0,
             'low_confidence_bars': 0,
             'anomalies_detected': 0,
-            'warmup_bars_discarded': 0
+            'warmup_bars_discarded': 0,
+            'institutional_trades': 0,
+            'vpin_buckets': 0,
+            'iceberg_clusters': 0,
+            'capitulation_events': 0,
+            'regime_transitions': 0,
+            'absorption_zones': 0,
         }
         self.warnings = []
         self.errors = []
@@ -105,6 +202,14 @@ class DataQualityReport:
         print(f"✓ Low confidence bars: {self.metrics['low_confidence_bars']:,}")
         print(f"✓ Anomalies detected: {self.metrics['anomalies_detected']:,}")
         print(f"✓ Warmup bars discarded: {self.metrics['warmup_bars_discarded']:,}")
+        
+        print(f"\n🔥 ADVANCED FEATURES DETECTED:")
+        print(f"✓ Institutional trades: {self.metrics['institutional_trades']:,}")
+        print(f"✓ VPIN volume buckets: {self.metrics['vpin_buckets']:,}")
+        print(f"✓ Iceberg order clusters: {self.metrics['iceberg_clusters']:,}")
+        print(f"✓ Capitulation events: {self.metrics['capitulation_events']:,}")
+        print(f"✓ Regime transitions: {self.metrics['regime_transitions']:,}")
+        print(f"✓ Absorption zones: {self.metrics['absorption_zones']:,}")
         
         if self.metrics['volume_conservation']:
             print(f"\n📊 Volume Conservation Check:")
@@ -560,6 +665,426 @@ def compute_base_features(df):
     return df
 
 # -----------------------
+# TIER 1: CRITICAL FEATURES - Trade-Level Enhancements
+# -----------------------
+
+def extract_time_features(df):
+    """
+    Extract comprehensive time-based features from timestamps.
+    Includes intraday sessions, cyclic encoding, and temporal patterns.
+    """
+    df = df.copy()
+    
+    if 'timestamp' not in df.columns:
+        return df
+    
+    # Extract basic time components
+    df['hour'] = df['timestamp'].dt.hour
+    df['day_of_week'] = df['timestamp'].dt.dayofweek  # 0=Monday, 6=Sunday
+    df['day_of_month'] = df['timestamp'].dt.day
+    df['month'] = df['timestamp'].dt.month
+    
+    # Cyclic encoding for hour (24-hour cycle)
+    df['hour_sin'] = np.sin(2 * np.pi * df['hour'] / 24)
+    df['hour_cos'] = np.cos(2 * np.pi * df['hour'] / 24)
+    
+    # Cyclic encoding for day of week (7-day cycle)
+    df['dow_sin'] = np.sin(2 * np.pi * df['day_of_week'] / 7)
+    df['dow_cos'] = np.cos(2 * np.pi * df['day_of_week'] / 7)
+    
+    # Intraday session classification (UTC-based, adjust if needed)
+    # Asian: 00:00-08:00, European: 08:00-16:00, US: 16:00-20:00, Late_US: 20:00-00:00
+    df['session'] = 'Unknown'
+    df.loc[(df['hour'] >= 0) & (df['hour'] < 8), 'session'] = 'Asian'
+    df.loc[(df['hour'] >= 8) & (df['hour'] < 16), 'session'] = 'European'
+    df.loc[(df['hour'] >= 16) & (df['hour'] < 20), 'session'] = 'US'
+    df.loc[(df['hour'] >= 20) & (df['hour'] < 24), 'session'] = 'Late_US'
+    
+    # Weekend effect
+    df['is_weekend'] = (df['day_of_week'] >= 5).astype(int)
+    
+    return df
+
+
+def calculate_trade_velocity_acceleration(df):
+    """
+    Calculate trade velocity and acceleration metrics.
+    Velocity = change in price / time delta
+    Acceleration = change in velocity / time delta
+    """
+    df = df.copy()
+    
+    if 'price' not in df.columns or 'dt' not in df.columns:
+        df['trade_velocity'] = 0.0
+        df['trade_acceleration'] = 0.0
+        return df
+    
+    # Velocity: price change per second
+    df['price_diff'] = df['price'].diff().fillna(0.0)
+    df['trade_velocity'] = df['price_diff'] / (df['dt'] + 1e-9)
+    df['trade_velocity'] = df['trade_velocity'].replace([np.inf, -np.inf], 0.0).fillna(0.0)
+    
+    # Acceleration: change in velocity per second
+    df['velocity_diff'] = df['trade_velocity'].diff().fillna(0.0)
+    df['trade_acceleration'] = df['velocity_diff'] / (df['dt'] + 1e-9)
+    df['trade_acceleration'] = df['trade_acceleration'].replace([np.inf, -np.inf], 0.0).fillna(0.0)
+    
+    return df
+
+
+def calculate_price_impact_metrics(df):
+    """
+    Calculate price impact per unit volume and directional impact.
+    Price impact = |price change| / volume
+    Signed impact = signed price change / volume
+    """
+    df = df.copy()
+    
+    if 'price' not in df.columns or 'quantity' not in df.columns:
+        df['price_impact'] = 0.0
+        df['signed_price_impact'] = 0.0
+        df['price_impact_bps'] = 0.0
+        return df
+    
+    # Price change (absolute and signed)
+    df['price_change_abs'] = df['price'].diff().abs().fillna(0.0)
+    df['price_change_signed'] = df['price'].diff().fillna(0.0)
+    
+    # Price impact per unit volume
+    df['price_impact'] = df['price_change_abs'] / (df['quantity'] + 1e-9)
+    df['signed_price_impact'] = df['price_change_signed'] / (df['quantity'] + 1e-9)
+    
+    # Price impact in basis points (bps)
+    df['price_impact_bps'] = (df['price_change_abs'] / (df['price'].shift(1) + 1e-9) * 10000).fillna(0.0)
+    
+    # Replace infinities
+    df['price_impact'] = df['price_impact'].replace([np.inf, -np.inf], 0.0).fillna(0.0)
+    df['signed_price_impact'] = df['signed_price_impact'].replace([np.inf, -np.inf], 0.0).fillna(0.0)
+    df['price_impact_bps'] = df['price_impact_bps'].replace([np.inf, -np.inf], 0.0).fillna(0.0)
+    
+    # Cumulative price impact (rolling sum over last 100 trades)
+    df['cumulative_price_impact'] = df['price_impact'].rolling(100, min_periods=1).sum()
+    
+    return df
+
+
+def estimate_spread_from_trades(df):
+    """
+    Estimate bid-ask spread using Lee-Ready algorithm.
+    Uses the tick rule: if trade price > previous, it's a buy; if <, it's a sell.
+    Effective spread = 2 * |trade_price - midpoint|
+    """
+    df = df.copy()
+    
+    if 'price' not in df.columns:
+        df['estimated_spread'] = 0.0
+        df['estimated_spread_bps'] = 0.0
+        df['midpoint_estimate'] = 0.0
+        return df
+    
+    # Estimate midpoint as rolling average of last few trades
+    df['midpoint_estimate'] = df['price'].rolling(5, min_periods=1).mean()
+    
+    # Effective spread estimate
+    df['estimated_spread'] = 2 * (df['price'] - df['midpoint_estimate']).abs()
+    
+    # Spread in basis points
+    df['estimated_spread_bps'] = (df['estimated_spread'] / (df['midpoint_estimate'] + 1e-9) * 10000).fillna(0.0)
+    df['estimated_spread_bps'] = df['estimated_spread_bps'].replace([np.inf, -np.inf], 0.0)
+    
+    # Tick direction for Lee-Ready
+    df['tick_direction'] = 0
+    price_diff = df['price'].diff()
+    df.loc[price_diff > 0, 'tick_direction'] = 1  # Uptick = buy
+    df.loc[price_diff < 0, 'tick_direction'] = -1  # Downtick = sell
+    df.loc[price_diff == 0, 'tick_direction'] = df['tick_direction'].shift(1).fillna(0)  # Zero-tick rule
+    
+    return df
+
+
+def calculate_microstructure_noise(df):
+    """
+    Quantify market microstructure noise using bid-ask bounce and autocovariance.
+    Noise ratio = -autocovariance(returns) / variance(returns)
+    """
+    df = df.copy()
+    
+    if 'price' not in df.columns:
+        df['microstructure_noise'] = 0.0
+        df['bid_ask_bounce'] = 0.0
+        return df
+    
+    # Calculate returns
+    df['return'] = df['price'].pct_change().fillna(0.0)
+    
+    # Rolling autocovariance (lag-1)
+    window = 100
+    df['autocov'] = df['return'].rolling(window, min_periods=2).apply(
+        lambda x: x.autocorr(lag=1) if len(x) > 1 else 0, raw=False
+    ).fillna(0.0)
+    
+    # Microstructure noise ratio (negative autocorrelation indicates bid-ask bounce)
+    df['microstructure_noise'] = -df['autocov']
+    df['microstructure_noise'] = df['microstructure_noise'].replace([np.inf, -np.inf], 0.0).fillna(0.0)
+    
+    # Bid-ask bounce indicator (high negative autocorrelation)
+    df['bid_ask_bounce'] = (df['autocov'] < -0.1).astype(int)
+    
+    return df
+
+
+def analyze_trade_size_distribution(df):
+    """
+    Classify trades by size into categories:
+    XS_Retail, S_Retail, M_Retail, L_Retail, Small_Whale, Medium_Whale, Large_Whale, Mega_Whale
+    Calculate institutional footprint score.
+    """
+    df = df.copy()
+    
+    if 'quantity' not in df.columns:
+        df['size_category'] = 'Unknown'
+        df['is_institutional'] = 0
+        df['institutional_score'] = 0.0
+        size_metrics = pd.DataFrame()
+        return df, size_metrics
+    
+    # Calculate percentiles for size classification
+    q10 = df['quantity'].quantile(0.10)
+    q25 = df['quantity'].quantile(0.25)
+    q50 = df['quantity'].quantile(0.50)
+    q75 = df['quantity'].quantile(0.75)
+    q90 = df['quantity'].quantile(0.90)
+    q95 = df['quantity'].quantile(0.95)
+    q99 = df['quantity'].quantile(0.99)
+    q999 = df['quantity'].quantile(0.999)
+    
+    # Size categorization
+    df['size_category'] = 'M_Retail'  # Default
+    df.loc[df['quantity'] <= q10, 'size_category'] = 'XS_Retail'
+    df.loc[(df['quantity'] > q10) & (df['quantity'] <= q25), 'size_category'] = 'S_Retail'
+    df.loc[(df['quantity'] > q25) & (df['quantity'] <= q50), 'size_category'] = 'M_Retail'
+    df.loc[(df['quantity'] > q50) & (df['quantity'] <= q75), 'size_category'] = 'L_Retail'
+    df.loc[(df['quantity'] > q75) & (df['quantity'] <= q90), 'size_category'] = 'Small_Whale'
+    df.loc[(df['quantity'] > q90) & (df['quantity'] <= q95), 'size_category'] = 'Medium_Whale'
+    df.loc[(df['quantity'] > q95) & (df['quantity'] <= q99), 'size_category'] = 'Large_Whale'
+    df.loc[df['quantity'] > q99, 'size_category'] = 'Mega_Whale'
+    
+    # Institutional flag (whales)
+    df['is_institutional'] = df['size_category'].isin(['Small_Whale', 'Medium_Whale', 'Large_Whale', 'Mega_Whale']).astype(int)
+    
+    # Institutional footprint score (rolling % of volume from whales)
+    window = 100
+    df['institutional_volume'] = df['quantity'] * df['is_institutional']
+    df['institutional_score'] = (
+        df['institutional_volume'].rolling(window, min_periods=1).sum() / 
+        (df['quantity'].rolling(window, min_periods=1).sum() + 1e-9)
+    ).fillna(0.0)
+    
+    # Create size distribution metrics
+    size_metrics = df.groupby('size_category').agg({
+        'quantity': ['count', 'sum', 'mean', 'std'],
+        'buy_vol': 'sum',
+        'sell_vol': 'sum'
+    }).reset_index()
+    
+    size_metrics.columns = ['size_category', 'trade_count', 'total_volume', 'avg_size', 'std_size', 'buy_volume', 'sell_volume']
+    size_metrics['volume_pct'] = 100 * size_metrics['total_volume'] / size_metrics['total_volume'].sum()
+    size_metrics['trade_pct'] = 100 * size_metrics['trade_count'] / size_metrics['trade_count'].sum()
+    
+    return df, size_metrics
+
+
+def analyze_trade_profitability(df, forward_periods=[1, 5, 10, 30]):
+    """
+    Analyze trade profitability by looking at price changes in future periods.
+    This helps identify "smart money" vs "dumb money" trades.
+    """
+    df = df.copy()
+    
+    if 'price' not in df.columns or 'is_buyer_maker' not in df.columns:
+        for period in forward_periods:
+            df[f'profit_{period}'] = 0.0
+            df[f'correct_direction_{period}'] = 0
+        return df
+    
+    # Calculate forward returns for each period
+    for period in forward_periods:
+        df[f'price_fwd_{period}'] = df['price'].shift(-period)
+        df[f'return_fwd_{period}'] = ((df[f'price_fwd_{period}'] - df['price']) / df['price'] * 100).fillna(0.0)
+        
+        # Profit calculation (positive if trade was in correct direction)
+        # If buyer was taker (is_buyer_maker=False) and price went up, profit is positive
+        # If seller was taker (is_buyer_maker=True) and price went down, profit is positive
+        df[f'profit_{period}'] = np.where(
+            df['is_buyer_maker'] == False,
+            df[f'return_fwd_{period}'],  # Buyer profit
+            -df[f'return_fwd_{period}']  # Seller profit
+        )
+        
+        # Binary indicator: was the trade direction correct?
+        df[f'correct_direction_{period}'] = (df[f'profit_{period}'] > 0).astype(int)
+    
+    # Calculate rolling win rate for smart money detection
+    window = 100
+    for period in forward_periods:
+        df[f'win_rate_{period}'] = df[f'correct_direction_{period}'].rolling(window, min_periods=1).mean()
+    
+    return df
+
+
+def detect_leader_follower_dynamics(df, window=50):
+    """
+    Detect leader-follower dynamics in trade flow.
+    Leaders are trades that are followed by trades in the same direction.
+    """
+    df = df.copy()
+    
+    if 'is_buyer_maker' not in df.columns:
+        df['is_leader'] = 0
+        df['leader_score'] = 0.0
+        return df
+    
+    # Define trade direction (1 = aggressive buy, -1 = aggressive sell)
+    df['trade_direction'] = np.where(df['is_buyer_maker'] == False, 1, -1)
+    
+    # Count consecutive trades in same direction (momentum)
+    df['direction_streak'] = 0
+    streak = 0
+    prev_direction = 0
+    
+    directions = df['trade_direction'].values
+    streaks = np.zeros(len(df))
+    
+    for i in range(len(df)):
+        if directions[i] == prev_direction:
+            streak += 1
+        else:
+            streak = 1
+            prev_direction = directions[i]
+        streaks[i] = streak
+    
+    df['direction_streak'] = streaks
+    
+    # Leader detection: trades that initiate a streak of >= 5 trades
+    df['is_leader'] = (df['direction_streak'] == 1) & (df['direction_streak'].shift(-4) >= 5)
+    df['is_leader'] = df['is_leader'].fillna(False).astype(int)
+    
+    # Leader score (rolling % of leader trades)
+    df['leader_score'] = df['is_leader'].rolling(window, min_periods=1).mean()
+    
+    return df
+
+
+def extract_tape_reading_features(df):
+    """
+    Extract tape reading features: aggression patterns, size changes, pace.
+    """
+    df = df.copy()
+    
+    if 'quantity' not in df.columns or 'is_buyer_maker' not in df.columns:
+        df['aggression_persistence'] = 0.0
+        df['size_momentum'] = 0.0
+        df['pace_acceleration'] = 0.0
+        return df
+    
+    # Aggression persistence (rolling % of aggressive trades)
+    window = 50
+    df['is_aggressive'] = (df['is_buyer_maker'] == False).astype(int)  # Taker = aggressive
+    df['aggression_persistence'] = df['is_aggressive'].rolling(window, min_periods=1).mean()
+    
+    # Size momentum (trend in trade sizes)
+    df['size_change'] = df['quantity'].diff().fillna(0.0)
+    df['size_momentum'] = df['size_change'].rolling(window, min_periods=1).mean()
+    
+    # Pace acceleration (change in trade frequency)
+    df['trade_spacing'] = df['dt']  # Time between trades
+    df['pace'] = 1.0 / (df['trade_spacing'] + 1e-9)  # Trades per second
+    df['pace_change'] = df['pace'].diff().fillna(0.0)
+    df['pace_acceleration'] = df['pace_change'].rolling(window, min_periods=1).mean()
+    
+    # Clean up
+    df['pace'] = df['pace'].replace([np.inf, -np.inf], 0.0).fillna(0.0)
+    df['pace_acceleration'] = df['pace_acceleration'].replace([np.inf, -np.inf], 0.0).fillna(0.0)
+    
+    return df
+
+
+# -----------------------
+# TIER 1: Aggregated Features for Timeframes
+# -----------------------
+
+def calculate_kyles_lambda(agg):
+    """
+    Calculate Kyle's Lambda (price impact coefficient).
+    Lambda = price change / signed volume
+    Measures permanent price impact per unit of order flow.
+    """
+    agg = agg.copy()
+    
+    if 'close' not in agg.columns or 'open' not in agg.columns or 'delta' not in agg.columns:
+        agg['kyles_lambda'] = 0.0
+        agg['kyles_lambda_ma'] = 0.0
+        return agg
+    
+    # Price change per bar
+    price_change = agg['close'] - agg['open']
+    
+    # Kyle's Lambda = price change / signed volume (delta)
+    agg['kyles_lambda'] = price_change / (agg['delta'].abs() + 1e-9)
+    agg['kyles_lambda'] = agg['kyles_lambda'].replace([np.inf, -np.inf], np.nan).fillna(0.0)
+    
+    # Rolling average for smoothing
+    agg['kyles_lambda_ma'] = agg['kyles_lambda'].rolling(W_SHORT, min_periods=1).mean()
+    
+    return agg
+
+
+def calculate_amihud_illiquidity(agg):
+    """
+    Calculate Amihud illiquidity ratio.
+    Illiquidity = |price return| / volume
+    Higher values indicate lower liquidity (higher price impact per volume).
+    """
+    agg = agg.copy()
+    
+    if 'close' not in agg.columns or 'volume' not in agg.columns:
+        agg['amihud_illiquidity'] = 0.0
+        agg['amihud_illiquidity_ma'] = 0.0
+        return agg
+    
+    # Price return (percentage)
+    agg['price_return'] = agg['close'].pct_change().fillna(0.0)
+    
+    # Amihud ratio = |return| / volume
+    agg['amihud_illiquidity'] = agg['price_return'].abs() / (agg['volume'] + 1e-9)
+    agg['amihud_illiquidity'] = agg['amihud_illiquidity'].replace([np.inf, -np.inf], np.nan).fillna(0.0)
+    
+    # Rolling average
+    agg['amihud_illiquidity_ma'] = agg['amihud_illiquidity'].rolling(W_SHORT, min_periods=1).mean()
+    
+    return agg
+
+
+def calculate_liquidity_depth_score(agg):
+    """
+    Calculate liquidity depth score based on volume and spread estimates.
+    Higher score = better liquidity (high volume, low spread, low price impact).
+    """
+    agg = agg.copy()
+    
+    # Normalize components
+    volume_score = agg.get('volume', 0.0) / (agg.get('volume', 0.0).rolling(W_LONG, min_periods=1).mean() + 1e-9)
+    impact_score = 1.0 / (agg.get('kyles_lambda', 1.0).abs() + 1e-9)  # Inverse of price impact
+    illiquidity_score = 1.0 / (agg.get('amihud_illiquidity', 1.0) + 1e-9)  # Inverse of illiquidity
+    
+    # Combined liquidity score
+    agg['liquidity_depth_score'] = (volume_score * 0.4 + impact_score * 0.3 + illiquidity_score * 0.3)
+    agg['liquidity_depth_score'] = agg['liquidity_depth_score'].replace([np.inf, -np.inf], np.nan).fillna(0.0)
+    
+    return agg
+
+
+# -----------------------
 # Resampling / bars
 # -----------------------
 def resample_bars(df, rule='15min'):
@@ -642,10 +1167,22 @@ def compute_zone_stats(df, bin_size=BIN_SIZE):
         total_sell_value=('sell_value','sum'),
         trades=('quantity','count'),
         first_time=('timestamp','min'),
-        last_time=('timestamp','max')
+        last_time=('timestamp','max'),
+        price_min=('price','min'),  # Add exact minimum price in zone
+        price_max=('price','max')   # Add exact maximum price in zone
     )
     grouped['total_vol'] = grouped['total_buy_vol'] + grouped['total_sell_vol']
     grouped['buy_imbalance_pct'] = 100 * grouped['total_buy_vol'] / grouped['total_vol'].replace(0, np.nan)
+    
+    # Warning if very few zones at trade level
+    if len(grouped) <= 3:
+        print(f"\n⚠️  WARNING: compute_zone_stats() found only {len(grouped)} zone(s) at trade level!")
+        print(f"   BIN_SIZE={bin_size} may be too large for price range: "
+              f"${df_zone['price'].min():.2f} - ${df_zone['price'].max():.2f}")
+        print(f"   Price range: ${df_zone['price'].max() - df_zone['price'].min():.2f}")
+        print(f"   Suggested BIN_SIZE: {max(0.1, (df_zone['price'].max() - df_zone['price'].min()) / 20):.2f} "
+              f"(to get ~20 zones)\n")
+    
     return grouped.sort_values('total_buy_value', ascending=False)
 
 # -----------------------
@@ -703,6 +1240,633 @@ def add_micro_features(a):
     # Fill inf/nans
     a = a.replace([np.inf, -np.inf], np.nan).fillna(0.0)
     return a
+
+
+# -----------------------
+# TIER 1: VPIN (Volume-Synchronized Probability of Informed Trading)
+# -----------------------
+
+def calculate_vpin(df, bucket_size=50):
+    """
+    Calculate VPIN (Volume-Synchronized Probability of Informed Trading).
+    Measures order flow toxicity by analyzing volume imbalance in volume buckets.
+    
+    VPIN = Average|OrderImbalance| / TotalVolume
+    
+    Returns DataFrame with VPIN metrics per volume bucket.
+    """
+    df = df.copy()
+    
+    if 'quantity' not in df.columns or 'buy_vol' not in df.columns or 'sell_vol' not in df.columns:
+        return pd.DataFrame({'vpin': [0.0], 'bucket_id': [0], 'volume_imbalance': [0.0]})
+    
+    # Create volume buckets
+    df['cumulative_volume'] = df['quantity'].cumsum()
+    total_volume = df['cumulative_volume'].iloc[-1] if len(df) > 0 else 0
+    
+    if total_volume == 0:
+        return pd.DataFrame({'vpin': [0.0], 'bucket_id': [0], 'volume_imbalance': [0.0]})
+    
+    # Assign bucket IDs
+    df['bucket_id'] = (df['cumulative_volume'] // bucket_size).astype(int)
+    
+    # Calculate order imbalance per bucket
+    bucket_stats = df.groupby('bucket_id').agg({
+        'buy_vol': 'sum',
+        'sell_vol': 'sum',
+        'quantity': 'sum',
+        'timestamp': ['first', 'last']
+    }).reset_index()
+    
+    bucket_stats.columns = ['bucket_id', 'buy_vol', 'sell_vol', 'total_vol', 'start_time', 'end_time']
+    
+    # Order imbalance = |buy_vol - sell_vol|
+    bucket_stats['volume_imbalance'] = (bucket_stats['buy_vol'] - bucket_stats['sell_vol']).abs()
+    
+    # VPIN = rolling average of (order imbalance / total volume)
+    window = 50  # Number of buckets to look back
+    bucket_stats['imbalance_ratio'] = bucket_stats['volume_imbalance'] / (bucket_stats['total_vol'] + 1e-9)
+    bucket_stats['vpin'] = bucket_stats['imbalance_ratio'].rolling(window, min_periods=1).mean()
+    
+    # VPIN volatility (standard deviation of imbalance)
+    bucket_stats['vpin_volatility'] = bucket_stats['imbalance_ratio'].rolling(window, min_periods=1).std().fillna(0.0)
+    
+    # Toxicity score (high VPIN = toxic flow)
+    bucket_stats['toxicity_score'] = bucket_stats['vpin'] * (1 + bucket_stats['vpin_volatility'])
+    
+    # Clean up
+    bucket_stats = bucket_stats.replace([np.inf, -np.inf], np.nan).fillna(0.0)
+    
+    return bucket_stats
+
+
+def calculate_order_toxicity(agg):
+    """
+    Calculate order toxicity index for aggregated bars.
+    Combines VPIN-like metrics with price impact and adverse selection.
+    """
+    agg = agg.copy()
+    
+    if 'buy_vol' not in agg.columns or 'sell_vol' not in agg.columns:
+        agg['order_toxicity'] = 0.0
+        agg['adverse_selection'] = 0.0
+        return agg
+    
+    # Order imbalance ratio
+    total_vol = agg['buy_vol'] + agg['sell_vol']
+    agg['order_imbalance_abs'] = (agg['buy_vol'] - agg['sell_vol']).abs()
+    agg['imbalance_ratio'] = agg['order_imbalance_abs'] / (total_vol + 1e-9)
+    
+    # VPIN-like metric (rolling average of imbalance)
+    agg['vpin_proxy'] = agg['imbalance_ratio'].rolling(W_SHORT, min_periods=1).mean()
+    
+    # Adverse selection (price moves against majority of volume)
+    agg['price_change'] = agg['close'] - agg['open']
+    agg['volume_direction'] = np.where(agg['buy_vol'] > agg['sell_vol'], 1, -1)
+    agg['price_direction'] = np.where(agg['price_change'] > 0, 1, -1)
+    agg['adverse_selection'] = (agg['volume_direction'] != agg['price_direction']).astype(int)
+    
+    # Order toxicity = VPIN * price volatility * adverse selection frequency
+    agg['adverse_selection_rate'] = agg['adverse_selection'].rolling(W_SHORT, min_periods=1).mean()
+    agg['order_toxicity'] = agg['vpin_proxy'] * agg.get('volatility_short', 1.0) * (1 + agg['adverse_selection_rate'])
+    
+    # Clean up
+    agg['order_toxicity'] = agg['order_toxicity'].replace([np.inf, -np.inf], np.nan).fillna(0.0)
+    
+    return agg
+
+
+def decompose_effective_spread(agg):
+    """
+    Decompose effective spread into adverse selection and realized spread components.
+    Effective Spread = Realized Spread + Adverse Selection Cost
+    """
+    agg = agg.copy()
+    
+    if 'close' not in agg.columns or 'open' not in agg.columns:
+        agg['effective_spread'] = 0.0
+        agg['realized_spread'] = 0.0
+        agg['adverse_selection_cost'] = 0.0
+        return agg
+    
+    # Estimate effective spread as high-low range
+    agg['effective_spread'] = agg['high'] - agg['low']
+    
+    # Midpoint
+    agg['midpoint'] = (agg['high'] + agg['low']) / 2
+    
+    # Price change (adverse selection proxy)
+    agg['midpoint_change'] = agg['midpoint'].diff().fillna(0.0)
+    
+    # Adverse selection cost (permanent price impact)
+    agg['adverse_selection_cost'] = agg['midpoint_change'].abs()
+    
+    # Realized spread (temporary price impact, mean-reverts)
+    agg['realized_spread'] = agg['effective_spread'] - agg['adverse_selection_cost']
+    agg['realized_spread'] = agg['realized_spread'].clip(lower=0)  # Can't be negative
+    
+    # Spread components as % of effective spread
+    agg['adverse_selection_pct'] = 100 * agg['adverse_selection_cost'] / (agg['effective_spread'] + 1e-9)
+    agg['realized_spread_pct'] = 100 * agg['realized_spread'] / (agg['effective_spread'] + 1e-9)
+    
+    # Clean up
+    agg = agg.replace([np.inf, -np.inf], np.nan).fillna(0.0)
+    
+    return agg
+
+
+# -----------------------
+# TIER 2: Market Regime Detection
+# -----------------------
+
+def detect_market_regime(agg):
+    """
+    Detect market regime: Volatility, Trend, and Volume regimes.
+    Uses quantile-based classification for robust detection.
+    """
+    agg = agg.copy()
+    
+    # Volatility regime
+    if 'volatility_short' in agg.columns:
+        vol = agg['volatility_short']
+    elif 'close' in agg.columns:
+        vol = agg['close'].pct_change().rolling(W_SHORT, min_periods=1).std()
+    else:
+        vol = pd.Series(0, index=agg.index)
+    
+    vol_q33 = vol.quantile(0.33)
+    vol_q67 = vol.quantile(0.67)
+    
+    agg['volatility_regime'] = 'Normal'
+    agg.loc[vol <= vol_q33, 'volatility_regime'] = 'Low'
+    agg.loc[vol >= vol_q67, 'volatility_regime'] = 'High'
+    
+    # Trend regime (ADX proxy using directional movement)
+    if 'close' in agg.columns:
+        # Calculate directional movement
+        agg['price_change'] = agg['close'].diff()
+        agg['abs_price_change'] = agg['price_change'].abs()
+        
+        # Directional indicators
+        agg['dm_plus'] = np.where(agg['price_change'] > 0, agg['abs_price_change'], 0)
+        agg['dm_minus'] = np.where(agg['price_change'] < 0, agg['abs_price_change'], 0)
+        
+        # ADX proxy = rolling mean of directional strength
+        window = W_MED
+        agg['di_plus'] = agg['dm_plus'].rolling(window, min_periods=1).sum()
+        agg['di_minus'] = agg['dm_minus'].rolling(window, min_periods=1).sum()
+        agg['dx'] = 100 * (agg['di_plus'] - agg['di_minus']).abs() / (agg['di_plus'] + agg['di_minus'] + 1e-9)
+        agg['adx_proxy'] = agg['dx'].rolling(window, min_periods=1).mean()
+        
+        # Trend regime classification
+        adx_q33 = agg['adx_proxy'].quantile(0.33)
+        adx_q67 = agg['adx_proxy'].quantile(0.67)
+        
+        agg['trend_regime'] = 'Weak'
+        agg.loc[agg['adx_proxy'] >= adx_q33, 'trend_regime'] = 'Moderate'
+        agg.loc[agg['adx_proxy'] >= adx_q67, 'trend_regime'] = 'Strong'
+        
+        # Trend direction
+        agg['trend_direction'] = 'Neutral'
+        agg.loc[agg['di_plus'] > agg['di_minus'], 'trend_direction'] = 'Up'
+        agg.loc[agg['di_minus'] > agg['di_plus'], 'trend_direction'] = 'Down'
+    else:
+        agg['trend_regime'] = 'Unknown'
+        agg['trend_direction'] = 'Unknown'
+        agg['adx_proxy'] = 0.0
+    
+    # Volume regime
+    if 'volume' in agg.columns:
+        vol_mean = agg['volume'].rolling(W_LONG, min_periods=1).mean()
+        vol_ratio = agg['volume'] / (vol_mean + 1e-9)
+        
+        vol_q33 = vol_ratio.quantile(0.33)
+        vol_q67 = vol_ratio.quantile(0.67)
+        
+        agg['volume_regime'] = 'Normal'
+        agg.loc[vol_ratio <= vol_q33, 'volume_regime'] = 'Low'
+        agg.loc[vol_ratio >= vol_q67, 'volume_regime'] = 'High'
+    else:
+        agg['volume_regime'] = 'Unknown'
+    
+    # Combined regime classification
+    agg['market_regime'] = agg['volatility_regime'] + '_' + agg['trend_regime'] + '_' + agg['volume_regime']
+    
+    return agg
+
+
+def detect_regime_transitions(agg):
+    """
+    Detect regime transitions and calculate transition probabilities.
+    Returns augmented dataframe and transition matrix.
+    """
+    agg = agg.copy()
+    
+    if 'market_regime' not in agg.columns:
+        agg['regime_transition'] = 0
+        agg['regime_stability'] = 1.0
+        return agg, pd.DataFrame()
+    
+    # Detect transitions
+    agg['prev_regime'] = agg['market_regime'].shift(1)
+    agg['regime_transition'] = (agg['market_regime'] != agg['prev_regime']).astype(int)
+    
+    # Regime stability (how long in current regime)
+    regime_counts = []
+    count = 0
+    prev = None
+    
+    for regime in agg['market_regime']:
+        if regime == prev:
+            count += 1
+        else:
+            count = 1
+            prev = regime
+        regime_counts.append(count)
+    
+    agg['regime_duration'] = regime_counts
+    
+    # Stability score (inverse of transition frequency)
+    window = W_MED
+    agg['regime_stability'] = 1.0 - agg['regime_transition'].rolling(window, min_periods=1).mean()
+    
+    # Build transition matrix
+    valid_data = agg[agg['prev_regime'].notna()][['prev_regime', 'market_regime']]
+    if len(valid_data) > 0:
+        transition_counts = pd.crosstab(valid_data['prev_regime'], valid_data['market_regime'])
+        transition_matrix = transition_counts.div(transition_counts.sum(axis=1), axis=0).fillna(0.0)
+    else:
+        transition_matrix = pd.DataFrame()
+    
+    return agg, transition_matrix
+
+
+def encode_cyclic_time(agg):
+    """
+    Add cyclic time encoding to aggregated data.
+    Encodes hour, day, week patterns using sin/cos.
+    """
+    agg = agg.copy()
+    
+    if agg.index.name != 'timestamp' and 'timestamp' not in agg.columns:
+        # Try to use index as timestamp
+        if isinstance(agg.index, pd.DatetimeIndex):
+            timestamps = agg.index
+        else:
+            return agg
+    else:
+        timestamps = agg.index if isinstance(agg.index, pd.DatetimeIndex) else agg['timestamp']
+    
+    # Hour encoding (24-hour cycle)
+    hour = timestamps.hour
+    agg['hour_sin'] = np.sin(2 * np.pi * hour / 24)
+    agg['hour_cos'] = np.cos(2 * np.pi * hour / 24)
+    
+    # Day of week encoding (7-day cycle)
+    day_of_week = timestamps.dayofweek
+    agg['dow_sin'] = np.sin(2 * np.pi * day_of_week / 7)
+    agg['dow_cos'] = np.cos(2 * np.pi * day_of_week / 7)
+    
+    # Day of month encoding (30-day cycle approximation)
+    day_of_month = timestamps.day
+    agg['dom_sin'] = np.sin(2 * np.pi * day_of_month / 30)
+    agg['dom_cos'] = np.cos(2 * np.pi * day_of_month / 30)
+    
+    return agg
+
+
+def analyze_session_transitions(agg):
+    """
+    Analyze intraday session patterns and transitions.
+    Returns augmented dataframe and session statistics.
+    """
+    agg = agg.copy()
+    
+    if not isinstance(agg.index, pd.DatetimeIndex):
+        return agg, pd.DataFrame()
+    
+    # Define sessions
+    hour = agg.index.hour
+    agg['session'] = 'Unknown'
+    agg.loc[(hour >= 0) & (hour < 8), 'session'] = 'Asian'
+    agg.loc[(hour >= 8) & (hour < 16), 'session'] = 'European'
+    agg.loc[(hour >= 16) & (hour < 20), 'session'] = 'US'
+    agg.loc[(hour >= 20) & (hour < 24), 'session'] = 'Late_US'
+    
+    # Session transitions
+    agg['prev_session'] = agg['session'].shift(1)
+    agg['session_transition'] = (agg['session'] != agg['prev_session']).astype(int)
+    
+    # Session statistics
+    if 'buy_vol' in agg.columns and 'sell_vol' in agg.columns:
+        session_stats = agg.groupby('session').agg({
+            'buy_vol': 'sum',
+            'sell_vol': 'sum',
+            'volume': 'sum',
+            'close': ['mean', 'std'],
+            'volatility_short': 'mean' if 'volatility_short' in agg.columns else 'count'
+        }).reset_index()
+        
+        session_stats.columns = ['session', 'buy_vol', 'sell_vol', 'total_vol', 'avg_price', 'price_volatility', 'avg_vol_volatility']
+        session_stats['buy_ratio'] = session_stats['buy_vol'] / (session_stats['buy_vol'] + session_stats['sell_vol'])
+    else:
+        session_stats = pd.DataFrame()
+    
+    return agg, session_stats
+
+
+# -----------------------
+# TIER 2: Smart Money Detection
+# -----------------------
+
+def calculate_smart_money_index(agg):
+    """
+    Calculate Smart Money Index (SMI).
+    Compares early session vs late session activity.
+    Smart money tends to trade early, retail tends to trade late.
+    """
+    agg = agg.copy()
+    
+    if not isinstance(agg.index, pd.DatetimeIndex):
+        agg['smart_money_index'] = 0.0
+        return agg
+    
+    hour = agg.index.hour
+    
+    # Early session (first 2 hours of major sessions)
+    early_session = ((hour >= 8) & (hour < 10)) | ((hour >= 16) & (hour < 18))
+    
+    # Late session (last 2 hours of major sessions)
+    late_session = ((hour >= 14) & (hour < 16)) | ((hour >= 22) & (hour < 24))
+    
+    if 'buy_vol' in agg.columns and 'sell_vol' in agg.columns:
+        # Early session net volume
+        early_net = np.where(early_session, agg['buy_vol'] - agg['sell_vol'], 0)
+        
+        # Late session net volume
+        late_net = np.where(late_session, agg['buy_vol'] - agg['sell_vol'], 0)
+        
+        # SMI = cumulative (early - late) net volume
+        agg['early_net_volume'] = early_net
+        agg['late_net_volume'] = late_net
+        agg['smart_money_index'] = (agg['early_net_volume'] - agg['late_net_volume']).cumsum()
+        
+        # Normalized SMI
+        agg['smi_normalized'] = agg['smart_money_index'] / (agg['volume'].rolling(W_LONG, min_periods=1).sum() + 1e-9)
+    else:
+        agg['smart_money_index'] = 0.0
+        agg['smi_normalized'] = 0.0
+    
+    return agg
+
+
+# -----------------------
+# TIER 2: Exhaustion & Reversal Detection
+# -----------------------
+
+def calculate_exhaustion_score(agg):
+    """
+    Calculate buyer and seller exhaustion scores.
+    Exhaustion = high volume + slowing momentum + divergences
+    """
+    agg = agg.copy()
+    
+    # Volume exhaustion (high volume but price not moving)
+    if 'volume' in agg.columns and 'close' in agg.columns:
+        vol_ma = agg['volume'].rolling(W_LONG, min_periods=1).mean()
+        vol_spike = agg['volume'] / (vol_ma + 1e-9)
+        
+        price_change = agg['close'].diff().abs()
+        price_momentum = price_change.rolling(W_SHORT, min_periods=1).mean()
+        
+        # Exhaustion = high volume but low price momentum
+        agg['volume_exhaustion'] = vol_spike / (price_momentum + 1e-9)
+        agg['volume_exhaustion'] = agg['volume_exhaustion'].replace([np.inf, -np.inf], np.nan).fillna(0.0)
+    else:
+        agg['volume_exhaustion'] = 0.0
+    
+    # Buyer exhaustion (high buy volume but price not rising)
+    if 'buy_vol' in agg.columns and 'close' in agg.columns:
+        buy_vol_ma = agg['buy_vol'].rolling(W_LONG, min_periods=1).mean()
+        buy_spike = agg['buy_vol'] / (buy_vol_ma + 1e-9)
+        
+        price_change = agg['close'].diff()
+        upward_momentum = price_change.rolling(W_SHORT, min_periods=1).mean()
+        
+        # High buy volume but price not going up = buyer exhaustion
+        agg['buyer_exhaustion'] = np.where(
+            upward_momentum > 0,
+            0,  # Price is rising, no exhaustion
+            buy_spike  # Price not rising despite high buy volume
+        )
+    else:
+        agg['buyer_exhaustion'] = 0.0
+    
+    # Seller exhaustion (high sell volume but price not falling)
+    if 'sell_vol' in agg.columns and 'close' in agg.columns:
+        sell_vol_ma = agg['sell_vol'].rolling(W_LONG, min_periods=1).mean()
+        sell_spike = agg['sell_vol'] / (sell_vol_ma + 1e-9)
+        
+        price_change = agg['close'].diff()
+        downward_momentum = price_change.rolling(W_SHORT, min_periods=1).mean()
+        
+        # High sell volume but price not going down = seller exhaustion
+        agg['seller_exhaustion'] = np.where(
+            downward_momentum < 0,
+            0,  # Price is falling, no exhaustion
+            sell_spike  # Price not falling despite high sell volume
+        )
+    else:
+        agg['seller_exhaustion'] = 0.0
+    
+    # Combined exhaustion score
+    agg['exhaustion_score'] = (agg['buyer_exhaustion'] + agg['seller_exhaustion']) / 2
+    
+    return agg
+
+
+def detect_capitulation_events(agg, threshold=2.0):
+    """
+    Detect capitulation events (panic selling or buying).
+    Capitulation = extreme volume + extreme price move + exhaustion
+    """
+    agg = agg.copy()
+    
+    if 'volume' not in agg.columns or 'close' not in agg.columns:
+        agg['capitulation_event'] = 0
+        agg['capitulation_type'] = 'None'
+        return agg
+    
+    # Volume spike
+    vol_ma = agg['volume'].rolling(W_LONG, min_periods=1).mean()
+    vol_std = agg['volume'].rolling(W_LONG, min_periods=1).std()
+    vol_zscore = (agg['volume'] - vol_ma) / (vol_std + 1e-9)
+    
+    # Price move
+    price_change_pct = agg['close'].pct_change() * 100
+    price_ma = price_change_pct.rolling(W_LONG, min_periods=1).mean()
+    price_std = price_change_pct.rolling(W_LONG, min_periods=1).std()
+    price_zscore = (price_change_pct - price_ma) / (price_std + 1e-9)
+    
+    # Capitulation = extreme volume + extreme price move
+    buy_capitulation = (vol_zscore > threshold) & (price_zscore > threshold)
+    sell_capitulation = (vol_zscore > threshold) & (price_zscore < -threshold)
+    
+    agg['capitulation_event'] = 0
+    agg.loc[buy_capitulation, 'capitulation_event'] = 1
+    agg.loc[sell_capitulation, 'capitulation_event'] = -1
+    
+    agg['capitulation_type'] = 'None'
+    agg.loc[buy_capitulation, 'capitulation_type'] = 'Buy_Capitulation'
+    agg.loc[sell_capitulation, 'capitulation_type'] = 'Sell_Capitulation'
+    
+    return agg
+
+
+def detect_divergences(agg):
+    """
+    Detect bullish and bearish divergences between price and volume/momentum.
+    Divergence = price makes new high/low but indicator doesn't confirm.
+    """
+    agg = agg.copy()
+    
+    if 'close' not in agg.columns:
+        agg['bullish_divergence'] = 0
+        agg['bearish_divergence'] = 0
+        return agg
+    
+    window = W_MED
+    
+    # Price highs and lows
+    price_high = agg['close'].rolling(window, min_periods=1).max()
+    price_low = agg['close'].rolling(window, min_periods=1).min()
+    
+    is_price_high = agg['close'] >= price_high
+    is_price_low = agg['close'] <= price_low
+    
+    # Volume/momentum indicator (use CVD if available, else volume)
+    if 'CVD' in agg.columns:
+        indicator = agg['CVD']
+    elif 'volume' in agg.columns:
+        indicator = agg['volume']
+    else:
+        indicator = pd.Series(0, index=agg.index)
+    
+    indicator_high = indicator.rolling(window, min_periods=1).max()
+    indicator_low = indicator.rolling(window, min_periods=1).min()
+    
+    # Bearish divergence: price makes new high but indicator doesn't
+    bearish_div = is_price_high & (indicator < indicator_high)
+    
+    # Bullish divergence: price makes new low but indicator doesn't
+    bullish_div = is_price_low & (indicator > indicator_low)
+    
+    agg['bullish_divergence'] = bullish_div.astype(int)
+    agg['bearish_divergence'] = bearish_div.astype(int)
+    
+    # Divergence score (how strong is the divergence)
+    agg['divergence_score'] = agg['bearish_divergence'] - agg['bullish_divergence']
+    
+    return agg
+
+
+# -----------------------
+# TIER 2: Absorption & Iceberg Detection
+# -----------------------
+
+def detect_absorption_zones(agg):
+    """
+    Detect absorption zones where large volume doesn't move price.
+    Absorption = high volume + low price movement = hidden liquidity
+    """
+    agg = agg.copy()
+    
+    if 'volume' not in agg.columns or 'close' not in agg.columns:
+        agg['absorption_score'] = 0.0
+        agg['is_absorption_zone'] = 0
+        return agg
+    
+    # Price efficiency = price change / volume
+    price_change = (agg['close'] - agg['open']).abs()
+    price_efficiency = price_change / (agg['volume'] + 1e-9)
+    
+    # Absorption = low price efficiency (volume absorbs price moves)
+    # Normalize by rolling stats
+    eff_ma = price_efficiency.rolling(W_LONG, min_periods=1).mean()
+    eff_std = price_efficiency.rolling(W_LONG, min_periods=1).std()
+    eff_zscore = (price_efficiency - eff_ma) / (eff_std + 1e-9)
+    
+    # Absorption score (negative z-score = low efficiency = absorption)
+    agg['absorption_score'] = -eff_zscore
+    agg['absorption_score'] = agg['absorption_score'].replace([np.inf, -np.inf], np.nan).fillna(0.0)
+    
+    # Mark absorption zones (threshold = 1 std below mean)
+    agg['is_absorption_zone'] = (agg['absorption_score'] > 1.0).astype(int)
+    
+    return agg
+
+
+def detect_iceberg_orders(df, volume_threshold_percentile=95, size_std_threshold=2.0):
+    """
+    Detect potential iceberg orders in raw trade data.
+    Iceberg = multiple trades of similar size at similar price over short time.
+    Returns DataFrame with iceberg order clusters.
+    """
+    df = df.copy()
+    
+    if 'quantity' not in df.columns or 'price' not in df.columns or 'timestamp' not in df.columns:
+        return pd.DataFrame({'iceberg_detected': [0], 'cluster_id': [0], 'total_volume': [0.0]})
+    
+    # Filter for large trades only
+    volume_threshold = df['quantity'].quantile(volume_threshold_percentile / 100.0)
+    large_trades = df[df['quantity'] >= volume_threshold].copy()
+    
+    if len(large_trades) < 3:
+        return pd.DataFrame({'iceberg_detected': [0], 'cluster_id': [0], 'total_volume': [0.0]})
+    
+    # Group trades by time windows (1-minute windows)
+    large_trades['time_bucket'] = large_trades['timestamp'].dt.floor('1min')
+    
+    # Analyze each time bucket
+    iceberg_clusters = []
+    
+    for bucket, group in large_trades.groupby('time_bucket'):
+        if len(group) < 3:
+            continue
+        
+        # Check if sizes are similar (low standard deviation)
+        size_mean = group['quantity'].mean()
+        size_std = group['quantity'].std()
+        size_cv = size_std / (size_mean + 1e-9)  # Coefficient of variation
+        
+        # Check if prices are similar
+        price_range = group['price'].max() - group['price'].min()
+        price_mean = group['price'].mean()
+        price_range_pct = price_range / (price_mean + 1e-9) * 100
+        
+        # Iceberg signature: many similar-sized trades at similar price
+        if size_cv < 0.2 and price_range_pct < 0.5:  # Low variation in size and price
+            iceberg_clusters.append({
+                'timestamp': bucket,
+                'trade_count': len(group),
+                'total_volume': group['quantity'].sum(),
+                'avg_size': size_mean,
+                'size_std': size_std,
+                'price_range_pct': price_range_pct,
+                'buy_volume': group['buy_vol'].sum(),
+                'sell_volume': group['sell_vol'].sum(),
+                'iceberg_score': len(group) * (1 - size_cv) * (1 - price_range_pct / 100)
+            })
+    
+    if len(iceberg_clusters) == 0:
+        return pd.DataFrame({'iceberg_detected': [0], 'cluster_id': [0], 'total_volume': [0.0]})
+    
+    iceberg_df = pd.DataFrame(iceberg_clusters)
+    iceberg_df['cluster_id'] = range(len(iceberg_df))
+    iceberg_df['iceberg_detected'] = 1
+    
+    return iceberg_df
+
 
 # -----------------------
 # Rolling percentile-based detector (buyers) with microstructure enhancement
@@ -1055,8 +2219,19 @@ def identify_price_zones_of_interest(agg_data, price_bin_size=10.0):
         'volume': 'sum',
         'OFI': 'mean',
         'CVD': 'last',
-        'trade_count': 'sum'
+        'trade_count': 'sum',
+        'close': ['min', 'max']  # Add exact price tracking
     }).reset_index()
+    
+    # Flatten the multi-level columns from the aggregation
+    if isinstance(zone_analysis.columns, pd.MultiIndex):
+        zone_analysis.columns = ['price_zone', 'buy_value', 'sell_value', 'buy_vol', 'sell_vol', 
+                                 'volume', 'OFI', 'CVD', 'trade_count', 'price_min', 'price_max']
+    else:
+        # If no multi-level (shouldn't happen but defensive)
+        if 'price_min' not in zone_analysis.columns:
+            zone_analysis['price_min'] = zone_analysis['price_zone']
+            zone_analysis['price_max'] = zone_analysis['price_zone'] + price_bin_size
 
     zone_analysis['total_value'] = zone_analysis['buy_value'] + zone_analysis['sell_value']
     zone_analysis['net_value_flow'] = zone_analysis['buy_value'] - zone_analysis['sell_value']
@@ -1064,8 +2239,26 @@ def identify_price_zones_of_interest(agg_data, price_bin_size=10.0):
     total_vol_sum = zone_analysis['volume'].sum() if 'volume' in zone_analysis.columns else 1.0
     zone_analysis['volume_concentration'] = zone_analysis['volume'] / (total_vol_sum + 1e-9)
 
-    volume_threshold = zone_analysis['volume'].quantile(0.80) if not zone_analysis['volume'].empty else 0.0
+    # Warning if very few zones detected
+    if len(zone_analysis) <= 3:
+        print(f"\n⚠️  WARNING: identify_price_zones_of_interest() found only {len(zone_analysis)} zone(s)!")
+        print(f"   This may indicate BIN_SIZE ({price_bin_size}) is too large for the price range")
+        print(f"   Consider reducing BIN_SIZE for more granular zone analysis\n")
+
+    # Adaptive threshold: if we have very few zones, be more lenient
+    if len(zone_analysis) <= 3:
+        # With 3 or fewer zones, include all as "significant"
+        volume_threshold = zone_analysis['volume'].min()
+    else:
+        volume_threshold = zone_analysis['volume'].quantile(0.80) if not zone_analysis['volume'].empty else 0.0
+    
     significant_zones = zone_analysis[zone_analysis['volume'] >= volume_threshold].copy()
+    
+    # Ensure we have at least some significant zones if any zones exist
+    if significant_zones.empty and not zone_analysis.empty:
+        # If threshold filtered everything out, take top 20% or at least 1
+        n_zones = max(1, int(len(zone_analysis) * 0.2))
+        significant_zones = zone_analysis.nlargest(n_zones, 'volume').copy()
 
     def categorize_zone(row):
         if row['buy_pressure_ratio'] >= 0.6:
@@ -1253,7 +2446,9 @@ def analyze_significant_zones_multi_timeframe(results_dict, price_bin_size=10.0)
         'buyer_score': 'mean',
         'seller_score': 'mean',
         'touch_count': 'sum',
-        'timeframe': lambda x: ','.join(x.unique())
+        'timeframe': lambda x: ','.join(x.unique()),
+        'price_min': 'min',  # Preserve exact minimum price in zone
+        'price_max': 'max'   # Preserve exact maximum price in zone
     }).reset_index()
     
     # Calculate final metrics
@@ -1263,11 +2458,24 @@ def analyze_significant_zones_multi_timeframe(results_dict, price_bin_size=10.0)
     final_zones['dominance'] = final_zones['buy_vol'] - final_zones['sell_vol']
     
     # Calculate importance score (multi-factor)
-    final_zones['volume_score'] = (final_zones['volume'] - final_zones['volume'].min()) / (final_zones['volume'].max() - final_zones['volume'].min() + 1e-9)
-    final_zones['value_score'] = (final_zones['total_value'] - final_zones['total_value'].min()) / (final_zones['total_value'].max() - final_zones['total_value'].min() + 1e-9)
-    final_zones['touch_score'] = (final_zones['touch_count'] - final_zones['touch_count'].min()) / (final_zones['touch_count'].max() - final_zones['touch_count'].min() + 1e-9)
-    final_zones['buyer_score_norm'] = (final_zones['buyer_score'] - final_zones['buyer_score'].min()) / (final_zones['buyer_score'].max() - final_zones['buyer_score'].min() + 1e-9)
-    final_zones['seller_score_norm'] = (final_zones['seller_score'] - final_zones['seller_score'].min()) / (final_zones['seller_score'].max() - final_zones['seller_score'].min() + 1e-9)
+    # Handle case where we have only 1 zone (min == max causes division issues)
+    def safe_normalize(series):
+        """Normalize series to 0-1 range, handling single-value edge case"""
+        min_val = series.min()
+        max_val = series.max()
+        range_val = max_val - min_val
+        
+        if range_val < 1e-6:  # Essentially zero range (single zone or all same values)
+            # Return middle score (0.5) for all if no variation
+            return pd.Series(0.5, index=series.index)
+        else:
+            return (series - min_val) / range_val
+    
+    final_zones['volume_score'] = safe_normalize(final_zones['volume'])
+    final_zones['value_score'] = safe_normalize(final_zones['total_value'])
+    final_zones['touch_score'] = safe_normalize(final_zones['touch_count'])
+    final_zones['buyer_score_norm'] = safe_normalize(final_zones['buyer_score'])
+    final_zones['seller_score_norm'] = safe_normalize(final_zones['seller_score'])
     
     # Composite importance score
     final_zones['importance_score'] = (
@@ -1298,6 +2506,18 @@ def analyze_significant_zones_multi_timeframe(results_dict, price_bin_size=10.0)
     
     print(f"✓ Consolidated into {len(final_zones)} unique price zones")
     
+    # Warn if very few zones detected
+    if len(final_zones) <= 3:
+        print(f"\n⚠️  WARNING: Only {len(final_zones)} zone(s) detected!")
+        print(f"   This may indicate:")
+        print(f"   - Very limited price movement in the data")
+        print(f"   - BIN_SIZE ({price_bin_size}) is too large for the price range")
+        print(f"   - Insufficient data across timeframes")
+        print(f"   Consider:")
+        print(f"   - Using a smaller BIN_SIZE (e.g., 5.0 or 1.0)")
+        print(f"   - Checking if data spans sufficient price levels")
+        print(f"   - Verifying all timeframes have data\n")
+    
     return final_zones
 
 def identify_key_levels(zones_df, top_n=10):
@@ -1319,25 +2539,45 @@ def identify_key_levels(zones_df, top_n=10):
     
     df = zones_df.copy()
     
+    # Warning if very few zones
+    if len(df) <= 3:
+        print(f"\n⚠️  WARNING: Only {len(df)} zone(s) available for key level identification")
+        print(f"   Key level analysis requires diverse zones for meaningful results\n")
+    
     # 1. Top Support Levels (Strong Buy Zones)
-    support = df[df['zone_type'].str.contains('BUY', na=False)].nlargest(top_n, 'importance_score')
-    print(f"\n✓ Top {len(support)} Support Levels (Buy Zones)")
+    support_candidates = df[df['zone_type'].str.contains('BUY', na=False)]
+    if len(support_candidates) == 0:
+        print(f"\n⚠️  No BUY zones found - cannot identify support levels")
+        support = pd.DataFrame()
+    else:
+        support = support_candidates.nlargest(min(top_n, len(support_candidates)), 'importance_score')
+        print(f"\n✓ Top {len(support)} Support Levels (Buy Zones)")
     
     # 2. Top Resistance Levels (Strong Sell Zones)
-    resistance = df[df['zone_type'].str.contains('SELL', na=False)].nlargest(top_n, 'importance_score')
-    print(f"✓ Top {len(resistance)} Resistance Levels (Sell Zones)")
+    resistance_candidates = df[df['zone_type'].str.contains('SELL', na=False)]
+    if len(resistance_candidates) == 0:
+        print(f"⚠️  No SELL zones found - cannot identify resistance levels")
+        resistance = pd.DataFrame()
+    else:
+        resistance = resistance_candidates.nlargest(min(top_n, len(resistance_candidates)), 'importance_score')
+        print(f"✓ Top {len(resistance)} Resistance Levels (Sell Zones)")
     
     # 3. High Volume Zones (most traded)
-    high_volume = df.nlargest(top_n, 'volume')
+    high_volume = df.nlargest(min(top_n, len(df)), 'volume')
     print(f"✓ Top {len(high_volume)} High Volume Zones")
     
     # 4. High Value Zones (most dollar flow)
-    high_value = df.nlargest(top_n, 'total_value')
+    high_value = df.nlargest(min(top_n, len(df)), 'total_value')
     print(f"✓ Top {len(high_value)} High Value Zones")
     
     # 5. Potential Reversal Zones (neutral with high activity)
-    reversal = df[df['zone_type'] == 'NEUTRAL'].nlargest(top_n, 'importance_score')
-    print(f"✓ Top {len(reversal)} Potential Reversal Zones")
+    reversal_candidates = df[df['zone_type'] == 'NEUTRAL']
+    if len(reversal_candidates) == 0:
+        print(f"⚠️  No NEUTRAL zones found - cannot identify reversal zones")
+        reversal = pd.DataFrame()
+    else:
+        reversal = reversal_candidates.nlargest(min(top_n, len(reversal_candidates)), 'importance_score')
+        print(f"✓ Top {len(reversal)} Potential Reversal Zones")
     
     return {
         'top_support': support,
@@ -1350,15 +2590,37 @@ def identify_key_levels(zones_df, top_n=10):
 def analyze_price_magnets(zones_df, results_dict):
     """
     Identifies price magnets - levels that repeatedly attract price action.
+    Enhanced to include timestamps, comparative zones, and minimum count validation.
+    
+    Note: price_zone represents the zone bin center (e.g., 90.0 for bin 90-100),
+    while price_min and price_max columns contain the exact minimum and maximum
+    prices observed within each zone during the analysis period.
     """
     print("\n" + "="*80)
     print("ANALYZING PRICE MAGNETS & ATTRACTION ZONES")
     print("="*80)
     
     if zones_df is None or zones_df.empty:
+        print("⚠️  No zone data available for magnet analysis")
         return pd.DataFrame()
     
     df = zones_df.copy()
+    
+    # Validation: Check for minimum zones
+    MIN_ZONES_REQUIRED = 5
+    if len(df) < MIN_ZONES_REQUIRED:
+        print(f"⚠️  Insufficient zones ({len(df)}) for meaningful magnet analysis (minimum: {MIN_ZONES_REQUIRED})")
+        print(f"   Returning all {len(df)} zones as potential magnets")
+        # Return all zones with magnet_strength calculated
+        df['magnet_strength'] = (
+            0.40 * df['touch_score'] +
+            0.30 * df['volume_score'] +
+            0.30 * (1 - (df['buy_pressure_ratio'] - 0.5).abs() * 2)
+        )
+        df['aligned_with_buyers'] = df['buyer_score'] > df['seller_score']
+        df['aligned_with_sellers'] = df['seller_score'] > df['buyer_score']
+        df['magnet_quality_rating'] = 'LOW_DATA'
+        return df.sort_values('magnet_strength', ascending=False)
     
     # Calculate magnet strength (combination of touches, volume, and reversion)
     df['magnet_strength'] = (
@@ -1367,19 +2629,100 @@ def analyze_price_magnets(zones_df, results_dict):
         0.30 * (1 - (df['buy_pressure_ratio'] - 0.5).abs() * 2)  # Higher for neutral zones
     )
     
-    # Identify magnets
+    # Adaptive threshold: use 0.80 quantile but ensure minimum count
     magnet_threshold = df['magnet_strength'].quantile(0.80)
     magnets = df[df['magnet_strength'] >= magnet_threshold].copy()
+    
+    # Ensure at least 3 magnets if we have enough zones
+    if len(magnets) < 3 and len(df) >= 3:
+        print(f"   Adjusting threshold to ensure minimum magnet count")
+        magnets = df.nlargest(min(3, len(df)), 'magnet_strength').copy()
     
     # Add session alignment
     magnets['aligned_with_buyers'] = magnets['buyer_score'] > magnets['seller_score']
     magnets['aligned_with_sellers'] = magnets['seller_score'] > magnets['buyer_score']
     
+    # Add comparative zone context (zones above and below each magnet)
+    magnets = magnets.sort_values('price_zone').reset_index(drop=True)
+    magnets['zone_above'] = magnets['price_zone'].shift(-1)
+    magnets['zone_below'] = magnets['price_zone'].shift(1)
+    magnets['distance_to_zone_above'] = magnets['zone_above'] - magnets['price_zone']
+    magnets['distance_to_zone_below'] = magnets['price_zone'] - magnets['zone_below']
+    
+    # Add zone position indicators
+    magnets['is_highest_zone'] = magnets['price_zone'] == magnets['price_zone'].max()
+    magnets['is_lowest_zone'] = magnets['price_zone'] == magnets['price_zone'].min()
+    magnets['zone_rank'] = range(1, len(magnets) + 1)
+    
+    # Add timestamp information from results_dict if available
+    # Extract earliest and latest timestamps from timeframe data
+    earliest_time = None
+    latest_time = None
+    
+    for tf_name in ['agg1m', 'agg5m', 'agg15m', 'agg1h', 'agg4h']:
+        if tf_name in results_dict and results_dict[tf_name] is not None:
+            tf_data = results_dict[tf_name]
+            if not tf_data.empty and hasattr(tf_data.index, 'min'):
+                tf_earliest = tf_data.index.min()
+                tf_latest = tf_data.index.max()
+                
+                if earliest_time is None or tf_earliest < earliest_time:
+                    earliest_time = tf_earliest
+                if latest_time is None or tf_latest > latest_time:
+                    latest_time = tf_latest
+    
+    # Add timestamp metadata to magnets
+    if earliest_time is not None and latest_time is not None:
+        magnets['analysis_period_start'] = earliest_time
+        magnets['analysis_period_end'] = latest_time
+        magnets['analysis_duration_hours'] = (latest_time - earliest_time).total_seconds() / 3600
+    else:
+        magnets['analysis_period_start'] = 'N/A'
+        magnets['analysis_period_end'] = 'N/A'
+        magnets['analysis_duration_hours'] = 0
+    
+    # Add data quality rating
+    def rate_magnet_quality(row):
+        """Rate the quality of magnet data on a 1-10 scale"""
+        score = 5  # Start at middle
+        
+        # High touch count is good (+2)
+        if row.get('touch_count', 0) >= 10:
+            score += 2
+        elif row.get('touch_count', 0) >= 5:
+            score += 1
+        
+        # High volume is good (+2)
+        if row.get('volume_score', 0) >= 0.7:
+            score += 2
+        elif row.get('volume_score', 0) >= 0.5:
+            score += 1
+        
+        # Has comparative zones (+1)
+        if pd.notna(row.get('zone_above')) and pd.notna(row.get('zone_below')):
+            score += 1
+        
+        return min(10, score)
+    
+    magnets['magnet_quality_rating'] = magnets.apply(rate_magnet_quality, axis=1)
+    
+    # Sort by magnet strength
     magnets = magnets.sort_values('magnet_strength', ascending=False)
+    
+    # Calculate summary statistics
+    avg_quality = magnets['magnet_quality_rating'].mean()
     
     print(f"✓ Identified {len(magnets)} price magnet zones")
     print(f"  • Buyer-aligned magnets: {magnets['aligned_with_buyers'].sum()}")
     print(f"  • Seller-aligned magnets: {magnets['aligned_with_sellers'].sum()}")
+    print(f"  • Average quality rating: {avg_quality:.1f}/10")
+    print(f"  • Price range: ${magnets['price_zone'].min():.2f} - ${magnets['price_zone'].max():.2f}")
+    if earliest_time is not None:
+        print(f"  • Analysis period: {earliest_time} to {latest_time}")
+    
+    # Warning if quality is low
+    if avg_quality < 5:
+        print(f"  ⚠️  Low average quality rating ({avg_quality:.1f}/10) - limited data for zone analysis")
     
     return magnets
 
@@ -1396,19 +2739,35 @@ def create_zone_hierarchy(zones_df):
     
     df = zones_df.copy()
     
+    # Warning if very few zones
+    if len(df) <= 3:
+        print(f"⚠️  Only {len(df)} zone(s) - hierarchy analysis limited\n")
+    
     # Define tiers based on importance score
-    importance_q66 = df['importance_score'].quantile(0.66)
-    importance_q33 = df['importance_score'].quantile(0.33)
-    
-    def assign_tier(score):
-        if score >= importance_q66:
-            return 'TIER_1_CRITICAL'
-        elif score >= importance_q33:
-            return 'TIER_2_IMPORTANT'
-        else:
-            return 'TIER_3_MINOR'
-    
-    df['tier'] = df['importance_score'].apply(assign_tier)
+    # Handle single-zone edge case where quantiles would be identical
+    if len(df) == 1:
+        # Single zone: always assign to TIER_1_CRITICAL
+        df['tier'] = 'TIER_1_CRITICAL'
+    elif len(df) == 2:
+        # Two zones: assign based on which is higher
+        median_score = df['importance_score'].median()
+        df['tier'] = df['importance_score'].apply(
+            lambda x: 'TIER_1_CRITICAL' if x >= median_score else 'TIER_2_IMPORTANT'
+        )
+    else:
+        # Three or more zones: use quantile-based assignment
+        importance_q66 = df['importance_score'].quantile(0.66)
+        importance_q33 = df['importance_score'].quantile(0.33)
+        
+        def assign_tier(score):
+            if score >= importance_q66:
+                return 'TIER_1_CRITICAL'
+            elif score >= importance_q33:
+                return 'TIER_2_IMPORTANT'
+            else:
+                return 'TIER_3_MINOR'
+        
+        df['tier'] = df['importance_score'].apply(assign_tier)
     
     # Count by tier and type
     hierarchy = df.groupby(['tier', 'zone_type']).agg({
@@ -1527,6 +2886,277 @@ def generate_trading_recommendations(key_levels, magnets, hierarchy_df):
             print(f"     Importance: {rec['importance']:.3f}")
     
     return rec_df
+
+
+# -----------------------
+# TIER 2: Multi-Timeframe Coherence & Alignment
+# -----------------------
+
+def calculate_timeframe_alignment(timeframe_dict):
+    """
+    Calculate alignment scores across multiple timeframes.
+    Measures if signals agree across timeframes (coherence).
+    
+    Args:
+        timeframe_dict: Dict with keys like '1min', '5min', etc., values are DataFrames
+    
+    Returns:
+        DataFrame with alignment scores per timestamp
+    """
+    if not timeframe_dict or len(timeframe_dict) < 2:
+        return pd.DataFrame({'alignment_score': [0.0]})
+    
+    # Use lowest timeframe as base
+    base_tf_name = '1min'
+    if base_tf_name not in timeframe_dict:
+        base_tf_name = list(timeframe_dict.keys())[0]
+    
+    base_df = timeframe_dict[base_tf_name].copy()
+    
+    if not isinstance(base_df.index, pd.DatetimeIndex):
+        return pd.DataFrame({'alignment_score': [0.0]})
+    
+    # Initialize alignment tracking
+    alignment_data = pd.DataFrame(index=base_df.index)
+    alignment_data['timestamp'] = base_df.index
+    
+    # For each timeframe, resample key signals to base timeframe
+    signal_cols = ['buyer_score_roll', 'seller_score_roll', 'OFI', 'CVD']
+    
+    for tf_name, tf_df in timeframe_dict.items():
+        if tf_name == base_tf_name:
+            continue
+        
+        if not isinstance(tf_df.index, pd.DatetimeIndex):
+            continue
+        
+        # Resample to base timeframe (forward fill)
+        for col in signal_cols:
+            if col in tf_df.columns:
+                resampled = tf_df[col].resample(base_df.index.freq or '1min').ffill()
+                alignment_data[f'{col}_{tf_name}'] = resampled.reindex(base_df.index, method='ffill')
+    
+    # Calculate alignment scores
+    # Alignment = correlation or directional agreement across timeframes
+    
+    # Directional alignment (all timeframes agree on direction)
+    for col in signal_cols:
+        if col not in base_df.columns:
+            continue
+        
+        base_signal = base_df[col]
+        base_direction = np.sign(base_signal)
+        
+        agreement_counts = []
+        for tf_name in timeframe_dict.keys():
+            if tf_name == base_tf_name:
+                continue
+            
+            col_name = f'{col}_{tf_name}'
+            if col_name in alignment_data.columns:
+                tf_direction = np.sign(alignment_data[col_name])
+                agreement = (base_direction == tf_direction).astype(int)
+                agreement_counts.append(agreement)
+        
+        if len(agreement_counts) > 0:
+            # Average agreement across timeframes
+            alignment_data[f'{col}_alignment'] = np.mean(agreement_counts, axis=0)
+    
+    # Overall alignment score (average of all signal alignments)
+    alignment_cols = [c for c in alignment_data.columns if c.endswith('_alignment')]
+    if len(alignment_cols) > 0:
+        alignment_data['alignment_score'] = alignment_data[alignment_cols].mean(axis=1)
+    else:
+        alignment_data['alignment_score'] = 0.5  # Neutral
+    
+    # Alignment strength (0 = complete disagreement, 1 = complete agreement)
+    alignment_data['alignment_strength'] = alignment_data['alignment_score']
+    
+    # Signal conflict (low alignment = conflicting signals)
+    alignment_data['signal_conflict'] = (alignment_data['alignment_score'] < 0.3).astype(int)
+    
+    return alignment_data
+
+
+def calculate_cross_timeframe_correlation(timeframe_dict, window=20):
+    """
+    Calculate rolling correlation between key metrics across timeframes.
+    
+    Returns:
+        DataFrame with correlation matrix and time-varying correlation stats
+    """
+    if not timeframe_dict or len(timeframe_dict) < 2:
+        return pd.DataFrame({'correlation': [0.0]})
+    
+    # Extract key metrics from each timeframe
+    metrics_to_correlate = ['CVD', 'OFI', 'buyer_score_roll', 'volume']
+    
+    correlation_results = []
+    
+    timeframe_names = list(timeframe_dict.keys())
+    
+    # Calculate pairwise correlations
+    for i, tf1_name in enumerate(timeframe_names):
+        for j, tf2_name in enumerate(timeframe_names):
+            if i >= j:  # Skip diagonal and duplicate pairs
+                continue
+            
+            tf1_df = timeframe_dict[tf1_name]
+            tf2_df = timeframe_dict[tf2_name]
+            
+            if not isinstance(tf1_df.index, pd.DatetimeIndex) or not isinstance(tf2_df.index, pd.DatetimeIndex):
+                continue
+            
+            for metric in metrics_to_correlate:
+                if metric not in tf1_df.columns or metric not in tf2_df.columns:
+                    continue
+                
+                # Resample both to common timeframe (use coarser one)
+                # Determine which is coarser
+                if len(tf1_df) < len(tf2_df):
+                    common_freq = tf1_df.index.freq or pd.infer_freq(tf1_df.index) or '5min'
+                    s1 = tf1_df[metric]
+                    s2 = tf2_df[metric].resample(common_freq).mean()
+                else:
+                    common_freq = tf2_df.index.freq or pd.infer_freq(tf2_df.index) or '5min'
+                    s1 = tf1_df[metric].resample(common_freq).mean()
+                    s2 = tf2_df[metric]
+                
+                # Align series
+                aligned = pd.DataFrame({'s1': s1, 's2': s2}).dropna()
+                
+                if len(aligned) < window:
+                    continue
+                
+                # Rolling correlation
+                rolling_corr = aligned['s1'].rolling(window, min_periods=window//2).corr(aligned['s2'])
+                
+                # Average correlation
+                avg_corr = rolling_corr.mean()
+                std_corr = rolling_corr.std()
+                
+                correlation_results.append({
+                    'timeframe_1': tf1_name,
+                    'timeframe_2': tf2_name,
+                    'metric': metric,
+                    'avg_correlation': avg_corr,
+                    'std_correlation': std_corr,
+                    'min_correlation': rolling_corr.min(),
+                    'max_correlation': rolling_corr.max()
+                })
+    
+    if len(correlation_results) == 0:
+        return pd.DataFrame({'correlation': [0.0]})
+    
+    correlation_df = pd.DataFrame(correlation_results)
+    
+    return correlation_df
+
+
+def calculate_fractal_dimension(series, max_lag=20):
+    """
+    Calculate fractal dimension of a time series using Higuchi's method.
+    Fractal dimension measures complexity/roughness of the series.
+    Values between 1-2: closer to 1 = trending, closer to 2 = random.
+    """
+    if len(series) < max_lag * 2:
+        return 1.5  # Neutral value
+    
+    series = np.array(series)
+    N = len(series)
+    
+    # Remove NaN and inf
+    series = series[np.isfinite(series)]
+    if len(series) < max_lag * 2:
+        return 1.5
+    
+    N = len(series)
+    
+    # Higuchi's method
+    L = []
+    k_values = range(1, max_lag + 1)
+    
+    for k in k_values:
+        Lk = []
+        for m in range(k):
+            Lmk = 0
+            max_idx = int((N - m - 1) / k)
+            for i in range(1, max_idx + 1):
+                Lmk += abs(series[m + i * k] - series[m + (i - 1) * k])
+            
+            if max_idx > 0:
+                Lmk = Lmk * (N - 1) / (max_idx * k * k)
+                Lk.append(Lmk)
+        
+        if len(Lk) > 0:
+            L.append(np.mean(Lk))
+    
+    if len(L) < 2:
+        return 1.5
+    
+    # Linear regression on log-log plot
+    x = np.log(k_values[:len(L)])
+    y = np.log(L)
+    
+    # Remove any inf or nan
+    valid = np.isfinite(x) & np.isfinite(y)
+    x = x[valid]
+    y = y[valid]
+    
+    if len(x) < 2:
+        return 1.5
+    
+    # Fit line: y = mx + b, fractal dimension = -m
+    coeffs = np.polyfit(x, y, 1)
+    fractal_dim = -coeffs[0]
+    
+    # Constrain to valid range [1, 2]
+    fractal_dim = np.clip(fractal_dim, 1.0, 2.0)
+    
+    return fractal_dim
+
+
+def detect_institutional_footprint(df, timeframe='1min'):
+    """
+    Detect institutional activity footprint across the dataset.
+    Combines whale detection, iceberg orders, and smart money indicators.
+    
+    Returns:
+        DataFrame with institutional activity summary
+    """
+    df = df.copy()
+    
+    # Ensure we have necessary columns
+    if 'is_institutional' not in df.columns:
+        df, _ = analyze_trade_size_distribution(df)
+    
+    # Aggregate by timeframe
+    if 'timestamp' not in df.columns:
+        return pd.DataFrame({'institutional_activity': [0.0]})
+    
+    df_agg = df.set_index('timestamp').resample(timeframe).agg({
+        'quantity': 'sum',
+        'is_institutional': 'sum',
+        'buy_vol': 'sum',
+        'sell_vol': 'sum',
+        'institutional_score': 'mean',
+        'win_rate_5': 'mean' if 'win_rate_5' in df.columns else 'count'
+    }).reset_index()
+    
+    df_agg.columns = ['timestamp', 'total_volume', 'institutional_trades', 'buy_volume', 'sell_volume', 'institutional_score', 'win_rate']
+    
+    # Institutional dominance
+    df_agg['institutional_dominance'] = df_agg['institutional_score']
+    
+    # Institutional flow direction
+    df_agg['institutional_buy_pct'] = 100 * df_agg['buy_volume'] / (df_agg['total_volume'] + 1e-9)
+    
+    # Mark significant institutional activity (top 10%)
+    threshold = df_agg['institutional_score'].quantile(0.90)
+    df_agg['is_significant_institutional'] = (df_agg['institutional_score'] > threshold).astype(int)
+    
+    return df_agg
+
 
 def comprehensive_zone_analysis(results_dict, output_folder):
     """
@@ -1743,10 +3373,43 @@ def add_all_features_to_timeframe(agg, timeframe_name=''):
     a.loc[:, 'volatility_long'] = a['close'].pct_change().rolling(W_LONG, min_periods=max(2, W_LONG//2)).std().fillna(0.0)
     a.loc[:, 'ATR_proxy'] = a['price_range'].rolling(W_SHORT, min_periods=max(1, W_SHORT//2)).mean()
     
-    # 12. Clean up infinities and NaNs
+    # 12. Add NEW TIER 1 & TIER 2 features
+    print(f"  🔥 Adding TIER 1 & TIER 2 advanced features...")
+    
+    # Liquidity metrics
+    a = calculate_kyles_lambda(a)
+    a = calculate_amihud_illiquidity(a)
+    a = calculate_liquidity_depth_score(a)
+    
+    # Order flow toxicity
+    a = calculate_order_toxicity(a)
+    a = decompose_effective_spread(a)
+    
+    # Market regime detection
+    a = detect_market_regime(a)
+    a, _ = detect_regime_transitions(a)  # Returns tuple (df, transition_matrix)
+    
+    # Time encoding
+    a = encode_cyclic_time(a)
+    a, _ = analyze_session_transitions(a)  # Returns tuple (df, session_stats)
+    
+    # Smart money detection
+    a = calculate_smart_money_index(a)
+    
+    # Exhaustion and reversal
+    a = calculate_exhaustion_score(a)
+    a = detect_capitulation_events(a)
+    a = detect_divergences(a)
+    
+    # Absorption zones
+    a = detect_absorption_zones(a)
+    
+    print(f"  ✓ Advanced features added successfully")
+    
+    # 13. Clean up infinities and NaNs
     a = a.replace([np.inf, -np.inf], np.nan).fillna(0.0)
     
-    # 13. Add reliability score based on warmup and confidence
+    # 14. Add reliability score based on warmup and confidence
     a['reliability_score'] = 1.0
     if 'is_warmup' in a.columns:
         a.loc[a['is_warmup'] == True, 'reliability_score'] = 0.3  # Low reliability during warmup
@@ -1775,6 +3438,40 @@ def process_single_file(zip_path, output_folder=OUTPUT_FOLDER):
     raw = validate_and_clean_data(raw)
     raw = add_market_context(raw)
     raw = compute_base_features(raw)
+    
+    print("\n" + "="*80)
+    print("STEP 1.5: TRADE-LEVEL ENHANCEMENTS (TIER 1)")
+    print("="*80)
+    
+    # Add TIER 1 trade-level features
+    print("🔧 Extracting time features...")
+    raw = extract_time_features(raw)
+    
+    print("🔧 Calculating trade velocity and acceleration...")
+    raw = calculate_trade_velocity_acceleration(raw)
+    
+    print("🔧 Calculating price impact metrics...")
+    raw = calculate_price_impact_metrics(raw)
+    
+    print("🔧 Estimating spread from trades...")
+    raw = estimate_spread_from_trades(raw)
+    
+    print("🔧 Calculating microstructure noise...")
+    raw = calculate_microstructure_noise(raw)
+    
+    print("🔧 Analyzing trade size distribution...")
+    raw, trade_size_metrics = analyze_trade_size_distribution(raw)
+    
+    print("🔧 Analyzing trade profitability...")
+    raw = analyze_trade_profitability(raw, forward_periods=[1, 5, 10, 30])
+    
+    print("🔧 Detecting leader-follower dynamics...")
+    raw = detect_leader_follower_dynamics(raw)
+    
+    print("🔧 Extracting tape reading features...")
+    raw = extract_tape_reading_features(raw)
+    
+    print(f"✅ Trade-level enhancements complete: {len(raw.columns)} features")
 
     # STEP 2: Multi-timeframe resampling with validation
     agg_dict = multi_timeframe_resample(raw)
@@ -1801,6 +3498,19 @@ def process_single_file(zip_path, output_folder=OUTPUT_FOLDER):
     print("STEP 4: SAVING ALL TIMEFRAME FEATURES")
     print("="*80)
     
+    # 🔥 ADD PRICE ZONES AND EXACT PRICE LEVELS TO ALL TIMEFRAMES
+    # This allows understanding what was happening at each price zone
+    # price_zone: The bin/range for aggregation (e.g., 95,520)
+    # zone_price_min/max: Exact price boundaries of that zone bin
+    for df_name, df in [('agg1m_full', agg1m_full), ('agg5m_full', agg5m_full), 
+                        ('agg15_full', agg15_full), ('agg1h_full', agg1h_full), 
+                        ('agg4h_full', agg4h_full)]:
+        if df is not None and not df.empty and 'close' in df.columns:
+            df['price_zone'] = (df['close'] // BIN_SIZE) * BIN_SIZE
+            # Add exact zone boundaries for precision
+            df['zone_price_min'] = df['price_zone']
+            df['zone_price_max'] = df['price_zone'] + BIN_SIZE
+    
     # 🔥 SAVE ALL TIMEFRAME FEATURES
     base_name = os.path.splitext(os.path.basename(zip_path))[0]
     base_out = os.path.join(output_folder, base_name)
@@ -1824,6 +3534,16 @@ def process_single_file(zip_path, output_folder=OUTPUT_FOLDER):
     print(f"✓ Detected {len(buyer_sessions)} buyer sessions")
     print(f"✓ Detected {len(seller_sessions)} seller sessions")
 
+    # 🔥 ADD PRICE ZONES AND EXACT PRICE LEVELS TO SCORED FEATURES
+    if not agg15_scored_buy.empty and 'close' in agg15_scored_buy.columns:
+        agg15_scored_buy['price_zone'] = (agg15_scored_buy['close'] // BIN_SIZE) * BIN_SIZE
+        agg15_scored_buy['zone_price_min'] = agg15_scored_buy['price_zone']
+        agg15_scored_buy['zone_price_max'] = agg15_scored_buy['price_zone'] + BIN_SIZE
+    if not agg15_scored_seller.empty and 'close' in agg15_scored_seller.columns:
+        agg15_scored_seller['price_zone'] = (agg15_scored_seller['close'] // BIN_SIZE) * BIN_SIZE
+        agg15_scored_seller['zone_price_min'] = agg15_scored_seller['price_zone']
+        agg15_scored_seller['zone_price_max'] = agg15_scored_seller['price_zone'] + BIN_SIZE
+
     # 🔥 SAVE 15M BUYER & SELLER SCORED FEATURES
     save_feature_output(agg15_scored_buy, "features_15m_buyer_scored", base_out)
     save_feature_output(agg15_scored_seller, "features_15m_seller_scored", base_out)
@@ -1836,6 +3556,12 @@ def process_single_file(zip_path, output_folder=OUTPUT_FOLDER):
     agg15_ml = ml_anomaly_detection(agg15_scored_buy)
     anomaly_count = agg15_ml['is_ml_anomaly'].sum() if 'is_ml_anomaly' in agg15_ml.columns else 0
     print(f"✓ Detected {anomaly_count} anomalies")
+    
+    # 🔥 ADD PRICE ZONE AND EXACT PRICE LEVELS TO ANOMALY OUTPUT
+    if not agg15_ml.empty and 'close' in agg15_ml.columns:
+        agg15_ml['price_zone'] = (agg15_ml['close'] // BIN_SIZE) * BIN_SIZE
+        agg15_ml['zone_price_min'] = agg15_ml['price_zone']
+        agg15_ml['zone_price_max'] = agg15_ml['price_zone'] + BIN_SIZE
     
     # 🔥 SAVE ML ANOMALY OUTPUT
     save_feature_output(agg15_ml, "anomalies_ml_15m", base_out)
@@ -1890,24 +3616,156 @@ def process_single_file(zip_path, output_folder=OUTPUT_FOLDER):
     print(f"✓ Buyer report: {report_buy}")
     print(f"✓ Seller report: {report_sell}")
 
-    print("\n" + "="*80)
-    print("STEP 10: COMPREHENSIVE ZONE & PRICE ANALYSIS")
-    print("="*80)
-    
-    # 🎯 RUN COMPREHENSIVE ZONE ANALYSIS
-    zone_analysis = comprehensive_zone_analysis(
-        {
-            'agg1m': agg1m_full,
-            'agg5m': agg5m_full,
-            'agg15m': agg15_full,
-            'agg1h': agg1h_full,
-            'agg4h': agg4h_full
-        },
-        base_out
-    )
+    # STEP 10: COMPREHENSIVE ZONE & PRICE ANALYSIS - DISABLED PER USER REQUEST
+    # The following zone analysis outputs have been disabled:
+    # - zones_multi_timeframe_consolidated.csv
+    # - zones_top_support_levels.csv
+    # - zones_top_resistance_levels.csv
+    # - zones_high_volume.csv
+    # - zones_high_value.csv
+    # - zones_reversal_potential.csv
+    # - zones_price_magnets.csv
+    # - zones_hierarchy.csv
+    # - trading_recommendations.csv
+    #
+    # print("\n" + "="*80)
+    # print("STEP 10: COMPREHENSIVE ZONE & PRICE ANALYSIS")
+    # print("="*80)
+    # 
+    # # 🎯 RUN COMPREHENSIVE ZONE ANALYSIS
+    # zone_analysis = comprehensive_zone_analysis(
+    #     {
+    #         'agg1m': agg1m_full,
+    #         'agg5m': agg5m_full,
+    #         'agg15m': agg15_full,
+    #         'agg1h': agg1h_full,
+    #         'agg4h': agg4h_full
+    #     },
+    #     base_out
+    # )
 
     print("\n" + "="*80)
-    print("STEP 11: SAVING DATA QUALITY REPORT")
+    print("STEP 11: ADVANCED ANALYTICS & NEW OUTPUTS")
+    print("="*80)
+    
+    # 🔥 ADD PRICE ZONE AND EXACT PRICE LEVELS TO RAW TRADES
+    # This allows understanding what was happening at each price zone at trade level
+    # price_zone: The bin for aggregation
+    # zone_price_min/max: Exact boundaries of that zone bin
+    if 'price' in raw.columns:
+        raw['price_zone'] = (raw['price'] // BIN_SIZE) * BIN_SIZE
+        raw['zone_price_min'] = raw['price_zone']
+        raw['zone_price_max'] = raw['price_zone'] + BIN_SIZE
+    
+    # 🔥 SAVE ENHANCED TRADE-LEVEL DATA
+    print("💾 Saving enhanced trade-level data...")
+    save_feature_output(raw, "trade_level_enhanced", base_out)
+    
+    # 🔥 SAVE TRADE SIZE DISTRIBUTION
+    print("💾 Saving trade size distribution...")
+    save_feature_output(trade_size_metrics, "trade_size_distribution", base_out)
+    
+    # 🔥 CALCULATE AND SAVE VPIN ANALYSIS
+    print("💾 Calculating VPIN analysis...")
+    vpin_data = calculate_vpin(raw, bucket_size=50)
+    quality_report.metrics['vpin_buckets'] = len(vpin_data)
+    save_feature_output(vpin_data, "vpin_analysis", base_out)
+    
+    # 🔥 DETECT AND SAVE ICEBERG ORDERS
+    print("💾 Detecting iceberg orders...")
+    iceberg_data = detect_iceberg_orders(raw)
+    quality_report.metrics['iceberg_clusters'] = len(iceberg_data)
+    save_feature_output(iceberg_data, "iceberg_orders_detected", base_out)
+    
+    # 🔥 INSTITUTIONAL ACTIVITY ANALYSIS
+    print("💾 Analyzing institutional activity...")
+    institutional_data = detect_institutional_footprint(raw, timeframe='1min')
+    if 'is_institutional' in raw.columns:
+        quality_report.metrics['institutional_trades'] = raw['is_institutional'].sum()
+    save_feature_output(institutional_data, "institutional_activity", base_out)
+    
+    # Track advanced feature detection
+    if 'capitulation_event' in agg15_full.columns:
+        quality_report.metrics['capitulation_events'] = (agg15_full['capitulation_event'] != 0).sum()
+    if 'regime_transition' in agg15_full.columns:
+        quality_report.metrics['regime_transitions'] = agg15_full['regime_transition'].sum()
+    if 'is_absorption_zone' in agg15_full.columns:
+        quality_report.metrics['absorption_zones'] = agg15_full['is_absorption_zone'].sum()
+    
+    # 🔥 TIMEFRAME ALIGNMENT ANALYSIS
+    print("💾 Calculating timeframe alignment...")
+    alignment_data = calculate_timeframe_alignment({
+        '1min': agg1m_full,
+        '5min': agg5m_full,
+        '15min': agg15_full,
+        '1h': agg1h_full,
+        '4h': agg4h_full
+    })
+    save_feature_output(alignment_data, "timeframe_alignment", base_out)
+    
+    # 🔥 CROSS-TIMEFRAME CORRELATIONS
+    print("💾 Calculating cross-timeframe correlations...")
+    correlation_matrix = calculate_cross_timeframe_correlation({
+        '1min': agg1m_full,
+        '5min': agg5m_full,
+        '15min': agg15_full,
+        '1h': agg1h_full,
+        '4h': agg4h_full
+    })
+    save_feature_output(correlation_matrix, "cross_timeframe_correlations", base_out)
+    
+    # 🔥 SAVE LIQUIDITY METRICS PER TIMEFRAME
+    print("💾 Saving liquidity metrics per timeframe...")
+    for tf_name, tf_data in [('1m', agg1m_full), ('5m', agg5m_full), ('15m', agg15_full), ('1h', agg1h_full), ('4h', agg4h_full)]:
+        liquidity_cols = ['kyles_lambda', 'kyles_lambda_ma', 'amihud_illiquidity', 'amihud_illiquidity_ma', 
+                         'liquidity_depth_score', 'order_toxicity', 'vpin_proxy', 'adverse_selection_rate']
+        available_cols = [col for col in liquidity_cols if col in tf_data.columns]
+        if available_cols:
+            liquidity_subset = tf_data[['timestamp'] + available_cols] if 'timestamp' in tf_data.columns else tf_data[available_cols]
+            save_feature_output(liquidity_subset, f"liquidity_metrics_{tf_name}", base_out)
+    
+    # 🔥 SAVE MARKET REGIMES PER TIMEFRAME
+    print("💾 Saving market regimes per timeframe...")
+    for tf_name, tf_data in [('1m', agg1m_full), ('5m', agg5m_full), ('15m', agg15_full), ('1h', agg1h_full), ('4h', agg4h_full)]:
+        regime_cols = ['market_regime', 'volatility_regime', 'trend_regime', 'volume_regime', 
+                      'trend_direction', 'adx_proxy', 'regime_transition', 'regime_duration', 'regime_stability']
+        available_cols = [col for col in regime_cols if col in tf_data.columns]
+        if available_cols:
+            regime_subset = tf_data[['timestamp'] + available_cols] if 'timestamp' in tf_data.columns else tf_data[available_cols]
+            save_feature_output(regime_subset, f"market_regimes_{tf_name}", base_out)
+    
+    # 🔥 SAVE SESSION ANALYSIS
+    print("💾 Saving session analysis...")
+    if 'session' in agg1m_full.columns:
+        session_cols = ['session', 'session_transition', 'hour_sin', 'hour_cos', 'dow_sin', 'dow_cos']
+        available_cols = [col for col in session_cols if col in agg1m_full.columns]
+        if available_cols:
+            session_subset = agg1m_full[['timestamp'] + available_cols] if 'timestamp' in agg1m_full.columns else agg1m_full[available_cols]
+            save_feature_output(session_subset, "session_analysis", base_out)
+    
+    # 🔥 SAVE SMART MONEY ANALYSIS
+    print("💾 Saving smart money analysis...")
+    smart_money_cols = ['smart_money_index', 'smi_normalized', 'win_rate_1', 'win_rate_5', 'win_rate_10', 'win_rate_30']
+    if 'smart_money_index' in agg15_full.columns:
+        available_cols = [col for col in smart_money_cols if col in agg15_full.columns]
+        if available_cols:
+            smart_money_subset = agg15_full[['timestamp'] + available_cols] if 'timestamp' in agg15_full.columns else agg15_full[available_cols]
+            save_feature_output(smart_money_subset, "smart_money_detection", base_out)
+    
+    # 🔥 SAVE EXHAUSTION SIGNALS PER TIMEFRAME
+    print("💾 Saving exhaustion signals per timeframe...")
+    for tf_name, tf_data in [('1m', agg1m_full), ('5m', agg5m_full), ('15m', agg15_full), ('1h', agg1h_full), ('4h', agg4h_full)]:
+        exhaustion_cols = ['exhaustion_score', 'buyer_exhaustion', 'seller_exhaustion', 'volume_exhaustion',
+                          'capitulation_event', 'capitulation_type', 'bullish_divergence', 'bearish_divergence', 'divergence_score']
+        available_cols = [col for col in exhaustion_cols if col in tf_data.columns]
+        if available_cols:
+            exhaustion_subset = tf_data[['timestamp'] + available_cols] if 'timestamp' in tf_data.columns else tf_data[available_cols]
+            save_feature_output(exhaustion_subset, f"exhaustion_signals_{tf_name}", base_out)
+    
+    print(f"✅ All new outputs saved successfully!")
+    
+    print("\n" + "="*80)
+    print("STEP 12: SAVING DATA QUALITY REPORT")
     print("="*80)
     
     # Save quality report
@@ -1923,6 +3781,34 @@ def process_single_file(zip_path, output_folder=OUTPUT_FOLDER):
     # Display summary
     quality_report.summary()
 
+    print("\n" + "="*80)
+    print("STEP 13: FEATURE SUMMARY")
+    print("="*80)
+    
+    # Print feature counts
+    print(f"\n📊 FEATURE COUNTS PER TIMEFRAME:")
+    print(f"  • 1-minute:  {len(agg1m_full.columns)} features across {len(agg1m_full)} bars")
+    print(f"  • 5-minute:  {len(agg5m_full.columns)} features across {len(agg5m_full)} bars")
+    print(f"  • 15-minute: {len(agg15_full.columns)} features across {len(agg15_full)} bars")
+    print(f"  • 1-hour:    {len(agg1h_full.columns)} features across {len(agg1h_full)} bars")
+    print(f"  • 4-hour:    {len(agg4h_full.columns)} features across {len(agg4h_full)} bars")
+    print(f"  • Trade-level: {len(raw.columns)} features across {len(raw)} trades")
+    
+    # Print sample features
+    print(f"\n🔍 SAMPLE FEATURES (from 15-minute):")
+    sample_features = list(agg15_full.columns[:20])
+    for i, feat in enumerate(sample_features, 1):
+        print(f"  {i:2d}. {feat}")
+    if len(agg15_full.columns) > 20:
+        print(f"  ... and {len(agg15_full.columns) - 20} more features")
+    
+    print("\n" + "="*80)
+    print("🎉 ANALYSIS COMPLETE!")
+    print("="*80)
+    print(f"\n✅ Generated comprehensive market microstructure analysis")
+    print(f"✅ All TIER 1, TIER 2, and TIER 3 features implemented")
+    print(f"✅ {len([f for f in os.listdir(base_out) if f.endswith('.csv')])} output files created")
+
     return {
         'buyer_sessions': buyer_sessions, 
         'seller_sessions': seller_sessions, 
@@ -1934,128 +3820,7 @@ def process_single_file(zip_path, output_folder=OUTPUT_FOLDER):
         'agg15m': agg15_full,
         'agg1h': agg1h_full,
         'agg4h': agg4h_full,
-    }, {
-        'base_output': base_out,
-        'report_buy': report_buy,
-        'report_sell': report_sell
-    }
-
-    
-    print(f"✓ Detected {len(buyer_sessions)} buyer sessions")
-    print(f"✓ Detected {len(seller_sessions)} seller sessions")
-
-    # 🔥 SAVE 15M BUYER & SELLER SCORED FEATURES
-    save_feature_output(agg15_scored_buy, "features_15m_buyer_scored", base_out)
-    save_feature_output(agg15_scored_seller, "features_15m_seller_scored", base_out)
-
-    print("\n" + "="*80)
-    print("STEP 6: ML ANOMALY DETECTION")
-    print("="*80)
-    
-    # ML anomaly detection
-    agg15_ml = ml_anomaly_detection(agg15_scored_buy)
-    anomaly_count = agg15_ml['is_ml_anomaly'].sum() if 'is_ml_anomaly' in agg15_ml.columns else 0
-    print(f"✓ Detected {anomaly_count} anomalies")
-    
-    # 🔥 SAVE ML ANOMALY OUTPUT
-    save_feature_output(agg15_ml, "anomalies_ml_15m", base_out)
-
-    print("\n" + "="*80)
-    print("STEP 7: COMPREHENSIVE DAILY ANALYSIS")
-    print("="*80)
-    
-    # Comprehensive daily analysis
-    daily_analysis = comprehensive_daily_analysis(buyer_sessions, seller_sessions, agg15_scored_buy)
-    
-    print(f"✓ Daily dominance: {daily_analysis['daily_dominance']['dominance_type']}")
-    print(f"✓ Composite score: {daily_analysis['daily_dominance']['composite_dominance_score']:.4f}")
-
-    print("\n" + "="*80)
-    print("STEP 8: SAVING SESSIONS & ANALYSIS OUTPUTS")
-    print("="*80)
-    
-    # 🔥 SAVE BUYER & SELLER SESSIONS
-    save_feature_output(buyer_sessions, "buyer_sessions", base_out)
-    save_feature_output(seller_sessions, "seller_sessions", base_out)
-
-    # 🔥 SAVE CATEGORIZED SESSIONS
-    save_feature_output(daily_analysis['categorized_buyers'], "buyer_sessions_categorized", base_out)
-    save_feature_output(daily_analysis['categorized_sellers'], "seller_sessions_categorized", base_out)
-
-    # 🔥 SAVE PRICE ZONES
-    zones = daily_analysis['price_zones_analysis']
-    save_feature_output(zones['all_zones'], "price_zones_all", base_out)
-    save_feature_output(zones['significant_zones'], "price_zones_significant", base_out)
-    
-    # Trade-level zones
-    trade_zones = compute_zone_stats(raw)
-    save_feature_output(trade_zones, "price_zones_trade_level", base_out)
-
-    # 🔥 SAVE DAILY DOMINANCE
-    dominance_df = pd.DataFrame([daily_analysis['daily_dominance']])
-    save_feature_output(dominance_df, "daily_dominance", base_out)
-
-    # 🔥 SAVE SUMMARY METRICS
-    summary_metrics_df = pd.DataFrame([daily_analysis['summary_metrics']])
-    save_feature_output(summary_metrics_df, "daily_summary_metrics", base_out)
-
-    print("\n" + "="*80)
-    print("STEP 9: GENERATING EXCEL REPORTS")
-    print("="*80)
-    
-    # Traditional reports (Excel)
-    report_buy = create_comprehensive_report(pd.DataFrame(buyer_sessions), base_out, prefix='buyer')
-    report_sell = create_comprehensive_report(pd.DataFrame(seller_sessions), base_out, prefix='seller')
-    
-    print(f"✓ Buyer report: {report_buy}")
-    print(f"✓ Seller report: {report_sell}")
-
-    print("\n" + "="*80)
-    print("STEP 10: COMPREHENSIVE ZONE & PRICE ANALYSIS")
-    print("="*80)
-    
-    # 🎯 RUN COMPREHENSIVE ZONE ANALYSIS
-    zone_analysis = comprehensive_zone_analysis(
-        {
-            'agg1m': agg1m_full,
-            'agg5m': agg5m_full,
-            'agg15m': agg15_full,
-            'agg1h': agg1h_full,
-            'agg4h': agg4h_full
-        },
-        base_out
-    )
-
-    print("\n" + "="*80)
-    print("STEP 11: FEATURE SUMMARY")
-    print("="*80)
-    
-    # Print feature counts
-    print(f"\n📊 FEATURE COUNTS PER TIMEFRAME:")
-    print(f"  • 1-minute:  {len(agg1m_full.columns)} features across {len(agg1m_full)} bars")
-    print(f"  • 5-minute:  {len(agg5m_full.columns)} features across {len(agg5m_full)} bars")
-    print(f"  • 15-minute: {len(agg15_full.columns)} features across {len(agg15_full)} bars")
-    print(f"  • 1-hour:    {len(agg1h_full.columns)} features across {len(agg1h_full)} bars")
-    print(f"  • 4-hour:    {len(agg4h_full.columns)} features across {len(agg4h_full)} bars")
-    
-    # Print sample features
-    print(f"\n🔍 SAMPLE FEATURES (from 15-minute):")
-    sample_features = list(agg15_full.columns[:20])
-    for i, feat in enumerate(sample_features, 1):
-        print(f"  {i:2d}. {feat}")
-    if len(agg15_full.columns) > 20:
-        print(f"  ... and {len(agg15_full.columns) - 20} more features")
-
-    return {
-        'buyer_sessions': buyer_sessions, 
-        'seller_sessions': seller_sessions, 
-        'daily_analysis': daily_analysis,
-        'zone_analysis': zone_analysis,
-        'agg1m': agg1m_full,
-        'agg5m': agg5m_full,
-        'agg15m': agg15_full,
-        'agg1h': agg1h_full,
-        'agg4h': agg4h_full,
+        'raw_enhanced': raw,
     }, {
         'base_output': base_out,
         'report_buy': report_buy,
@@ -2107,16 +3872,17 @@ def main():
     print("     • daily_summary_metrics.csv")
     print("     • anomalies_ml_15m.csv")
     
-    print("\n  🔹 ZONE & PRICE ANALYSIS:")
-    print("     • zones_multi_timeframe_consolidated.csv")
-    print("     • zones_top_support_levels.csv")
-    print("     • zones_top_resistance_levels.csv")
-    print("     • zones_high_volume.csv")
-    print("     • zones_high_value.csv")
-    print("     • zones_reversal_potential.csv")
-    print("     • zones_price_magnets.csv")
-    print("     • zones_hierarchy.csv")
-    print("     • trading_recommendations.csv")
+    # ZONE & PRICE ANALYSIS outputs have been disabled per user request
+    # print("\n  🔹 ZONE & PRICE ANALYSIS:")
+    # print("     • zones_multi_timeframe_consolidated.csv")
+    # print("     • zones_top_support_levels.csv")
+    # print("     • zones_top_resistance_levels.csv")
+    # print("     • zones_high_volume.csv")
+    # print("     • zones_high_value.csv")
+    # print("     • zones_reversal_potential.csv")
+    # print("     • zones_price_magnets.csv")
+    # print("     • zones_hierarchy.csv")
+    # print("     • trading_recommendations.csv")
     
     print("\n  🔹 UNIFIED DATA:")
     print("     • all_events.csv (master file with all outputs)")
@@ -2249,11 +4015,13 @@ def main():
     print("\n💡 USAGE TIPS:")
     print("   • Load 'all_events.csv' for unified analysis across all outputs")
     print("   • Each timeframe CSV contains 100+ calculated features")
-    print("   • Use 'trading_recommendations.csv' for actionable trading insights")
-    print("   • Check 'zones_top_support_levels.csv' and 'zones_top_resistance_levels.csv'")
-    print("   • Review 'zones_price_magnets.csv' for price attraction zones")
     print("   • Use categorized sessions for aggressive buyer/seller identification")
-    print("   • 'zones_hierarchy.csv' shows critical vs minor zones\n")
+    # Zone analysis tips removed - feature disabled per user request
+    # print("   • Use 'trading_recommendations.csv' for actionable trading insights")
+    # print("   • Check 'zones_top_support_levels.csv' and 'zones_top_resistance_levels.csv'")
+    # print("   • Review 'zones_price_magnets.csv' for price attraction zones")
+    # print("   • 'zones_hierarchy.csv' shows critical vs minor zones")
+    print("")
     
     return results
 
