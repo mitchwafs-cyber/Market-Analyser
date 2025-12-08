@@ -3616,21 +3616,33 @@ def process_single_file(zip_path, output_folder=OUTPUT_FOLDER):
     print(f"✓ Buyer report: {report_buy}")
     print(f"✓ Seller report: {report_sell}")
 
-    print("\n" + "="*80)
-    print("STEP 10: COMPREHENSIVE ZONE & PRICE ANALYSIS")
-    print("="*80)
-    
-    # 🎯 RUN COMPREHENSIVE ZONE ANALYSIS
-    zone_analysis = comprehensive_zone_analysis(
-        {
-            'agg1m': agg1m_full,
-            'agg5m': agg5m_full,
-            'agg15m': agg15_full,
-            'agg1h': agg1h_full,
-            'agg4h': agg4h_full
-        },
-        base_out
-    )
+    # STEP 10: COMPREHENSIVE ZONE & PRICE ANALYSIS - DISABLED PER USER REQUEST
+    # The following zone analysis outputs have been disabled:
+    # - zones_multi_timeframe_consolidated.csv
+    # - zones_top_support_levels.csv
+    # - zones_top_resistance_levels.csv
+    # - zones_high_volume.csv
+    # - zones_high_value.csv
+    # - zones_reversal_potential.csv
+    # - zones_price_magnets.csv
+    # - zones_hierarchy.csv
+    # - trading_recommendations.csv
+    #
+    # print("\n" + "="*80)
+    # print("STEP 10: COMPREHENSIVE ZONE & PRICE ANALYSIS")
+    # print("="*80)
+    # 
+    # # 🎯 RUN COMPREHENSIVE ZONE ANALYSIS
+    # zone_analysis = comprehensive_zone_analysis(
+    #     {
+    #         'agg1m': agg1m_full,
+    #         'agg5m': agg5m_full,
+    #         'agg15m': agg15_full,
+    #         'agg1h': agg1h_full,
+    #         'agg4h': agg4h_full
+    #     },
+    #     base_out
+    # )
 
     print("\n" + "="*80)
     print("STEP 11: ADVANCED ANALYTICS & NEW OUTPUTS")
@@ -3860,16 +3872,17 @@ def main():
     print("     • daily_summary_metrics.csv")
     print("     • anomalies_ml_15m.csv")
     
-    print("\n  🔹 ZONE & PRICE ANALYSIS:")
-    print("     • zones_multi_timeframe_consolidated.csv")
-    print("     • zones_top_support_levels.csv")
-    print("     • zones_top_resistance_levels.csv")
-    print("     • zones_high_volume.csv")
-    print("     • zones_high_value.csv")
-    print("     • zones_reversal_potential.csv")
-    print("     • zones_price_magnets.csv")
-    print("     • zones_hierarchy.csv")
-    print("     • trading_recommendations.csv")
+    # ZONE & PRICE ANALYSIS outputs have been disabled per user request
+    # print("\n  🔹 ZONE & PRICE ANALYSIS:")
+    # print("     • zones_multi_timeframe_consolidated.csv")
+    # print("     • zones_top_support_levels.csv")
+    # print("     • zones_top_resistance_levels.csv")
+    # print("     • zones_high_volume.csv")
+    # print("     • zones_high_value.csv")
+    # print("     • zones_reversal_potential.csv")
+    # print("     • zones_price_magnets.csv")
+    # print("     • zones_hierarchy.csv")
+    # print("     • trading_recommendations.csv")
     
     print("\n  🔹 UNIFIED DATA:")
     print("     • all_events.csv (master file with all outputs)")
@@ -4002,11 +4015,13 @@ def main():
     print("\n💡 USAGE TIPS:")
     print("   • Load 'all_events.csv' for unified analysis across all outputs")
     print("   • Each timeframe CSV contains 100+ calculated features")
-    print("   • Use 'trading_recommendations.csv' for actionable trading insights")
-    print("   • Check 'zones_top_support_levels.csv' and 'zones_top_resistance_levels.csv'")
-    print("   • Review 'zones_price_magnets.csv' for price attraction zones")
     print("   • Use categorized sessions for aggressive buyer/seller identification")
-    print("   • 'zones_hierarchy.csv' shows critical vs minor zones\n")
+    # Zone analysis tips removed - feature disabled per user request
+    # print("   • Use 'trading_recommendations.csv' for actionable trading insights")
+    # print("   • Check 'zones_top_support_levels.csv' and 'zones_top_resistance_levels.csv'")
+    # print("   • Review 'zones_price_magnets.csv' for price attraction zones")
+    # print("   • 'zones_hierarchy.csv' shows critical vs minor zones")
+    print("")
     
     return results
 

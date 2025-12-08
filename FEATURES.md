@@ -602,7 +602,24 @@ For questions or issues:
 
 ## Enhanced Price Magnets Output
 
-The `zones_price_magnets.csv` file now includes comprehensive information:
+**⚠️ NOTE: The comprehensive zone analysis feature has been disabled. The following output files are no longer generated:**
+- zones_multi_timeframe_consolidated.csv
+- zones_top_support_levels.csv
+- zones_top_resistance_levels.csv
+- zones_high_volume.csv
+- zones_high_value.csv
+- zones_reversal_potential.csv
+- zones_price_magnets.csv
+- zones_hierarchy.csv
+- trading_recommendations.csv
+
+**The functions remain in the code but are commented out and can be re-enabled if needed.**
+
+---
+
+### Historical Documentation (Feature Disabled)
+
+The `zones_price_magnets.csv` file (when enabled) includes comprehensive information:
 
 **Core Metrics** (existing):
 - price_zone, magnet_strength, touch_count, volume_score
